@@ -165,3 +165,5 @@ jobs:
             `gh attestation verify Zarp.exe --repo ${{ github.repository }}`
 
             [Code signing policy](https://github.com/${{ github.repository }}#code-signing-policy)
+
+            **Third-party software inside Zarp.exe.** Zarp's own code is MIT. The file also carries unmodified upstream programs: zapret2 with WinDivert and the Cygwin DLL (MIT, LGPL-3.0), sing-box with Wintun (GPL-3.0-or-later) and Xray-core (MPL-2.0, with GPL-3.0-or-later modules inside). Versions, license texts and the places to get their source code are in [THIRD_PARTY_NOTICES.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/THIRD_PARTY_NOTICES.md). The same texts are in the program: Settings, Licenses.

@@ -5,9 +5,9 @@ using System.Linq;
 namespace Zarp.Core
 {
     /// <summary>
-    /// Тексты лицензий Zarp и вшитых компонентов (zapret2, WinDivert, Cygwin, LuaJIT, zlib).
-    /// Лежат в exe как ресурсы "licenses/..." и распаковываются рядом с данными программы,
-    /// чтобы сопровождать распространяемые бинарники, как того требуют MIT и LGPL.
+    /// Тексты лицензий Zarp и вшитых компонентов (zapret2, WinDivert, Cygwin, LuaJIT, zlib, sing-box, Xray-core, Wintun,
+    /// данные ipverse). Лежат в exe как ресурсы "licenses/..." и распаковываются рядом с данными программы,
+    /// чтобы сопровождать распространяемые бинарники, как того требуют MIT, LGPL, GPL и MPL.
     /// </summary>
     public static class Licenses
     {

@@ -42,7 +42,7 @@ The servers are saved in `subscription.json` in your data folder (it holds the l
 
 The server replaces WARP: Zarp does not register a WARP device and does not need the WARP client. The check requires a valid HTTPS answer from `cdn-cgi/trace` that came through the server, and the connection time is the time of the first answer. If the server has no IPv6 access, turn off **IPv6 through the server** in the same window. DNS requests go to the DNS server from that window (1.1.1.1 by default) through your server.
 
-The engine is [sing-box 1.13.14](https://github.com/SagerNet/sing-box/tree/v1.13.14), GPL-3.0-or-later, embedded into `Zarp.exe` and started as a separate process. sing-box cannot speak XHTTP, so for XHTTP links it hands the traffic to [Xray-core 26.7.28](https://github.com/XTLS/Xray-core/tree/v26.7.28) (MPL-2.0), which is embedded and started the same way, and only for such links. See [third-party notices](../THIRD_PARTY_NOTICES.md).
+The engine is [sing-box 1.13.14](https://github.com/SagerNet/sing-box/tree/v1.13.14), GPL-3.0-or-later, embedded into `Zarp.exe` and started as a separate process. sing-box cannot speak XHTTP, so for XHTTP links it hands the traffic to [Xray-core 26.7.28](https://github.com/XTLS/Xray-core/tree/v26.7.28) (MPL-2.0, with GPL-3.0-or-later modules inside), which is embedded and started the same way, and only for such links. See [third-party notices](../THIRD_PARTY_NOTICES.md).
 
 ## Routing
 
