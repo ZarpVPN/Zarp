@@ -21,7 +21,8 @@ namespace Zarp.Core
     /// <summary>
     /// Стратегия = протокол туннеля WARP + профиль winws2 (zapret2).
     /// Пустой Args означает «без zapret» - WARP подключается напрямую.
-    /// Если задан Profile, это не стратегия обхода, а собственный сервер, который заменяет WARP.
+    /// Если задан Profile, это пара «стратегия zapret2 + собственный сервер»: winws2 проводит через DPI соединение с этим
+    /// сервером (VLESS, Trojan, Hysteria2, XHTTP), а сервер заменяет WARP. Транспорт пары - транспорт стратегии.
     /// </summary>
     public sealed class Strategy
     {
@@ -36,11 +37,12 @@ namespace Zarp.Core
         /// что она работает у любого провайдера страны. Пустой список: стране не назначена, видна только при «All».
         /// </summary>
         public string[] Countries = new string[0];
-        /// <summary>Собственный сервер (VLESS, Trojan, Hysteria2) вместо WARP.</summary>
+        /// <summary>Собственный сервер (VLESS, Trojan, Hysteria2, XHTTP) вместо WARP.</summary>
         public ProxyProfile Profile;
 
         public bool IsProxy => Profile != null;
-        public bool UsesZapret => !IsProxy && !string.IsNullOrWhiteSpace(Args);
+        /// <summary>Работает с winws2. У пары «стратегия + сервер» он обязателен; у стратегии WARP пустой Args означает «без zapret».</summary>
+        public bool UsesZapret => !string.IsNullOrWhiteSpace(Args);
         public string ProtocolTitle => IsProxy ? Profile.Title : TransportTitle(Transport);
 
         public Strategy Clone() => new Strategy

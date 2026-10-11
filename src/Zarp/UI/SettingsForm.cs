@@ -380,7 +380,7 @@ namespace Zarp.UI
                 {
                     Tag = s,
                     UseItemStyleForSubItems = false,
-                    ToolTipText = s.IsProxy ? s.Profile.Endpoint : s.UsesZapret ? s.Args : L.T("settings.directTip"),
+                    ToolTipText = s.IsProxy ? s.Profile.Endpoint + "\n" + s.Args : s.UsesZapret ? s.Args : L.T("settings.directTip"),
                 };
                 if (current) item.SubItems[1].Font = Theme.Font(9f, FontStyle.Bold);
                 item.SubItems[3].ForeColor = r == null ? Theme.TextDim : r.Ok ? (r.Confirmed ? Theme.Ok : Theme.Busy) : Theme.Bad;
@@ -462,12 +462,13 @@ namespace Zarp.UI
         void UpdateButtons()
         {
             bool busy = _engine.IsBusy;
-            _custom.Enabled = !busy && !_editing && !_engine.ProxyMode;
-            // фильтр стран касается только стратегий WARP: единственный собственный сервер он не трогает
-            _filter.Visible = !_engine.ProxyMode;
+            // свои стратегии и фильтр стран работают и со своим сервером: стратегии те же, а сервер - их эндпоинт
+            _custom.Enabled = !busy && !_editing;
             _filter.Enabled = !busy;
             ShowFullTip();
-            _isolate.Enabled = _restrict.Enabled = _timeout.Enabled = _stopAfter.Enabled = !busy;
+            // перехват адресов WARP и другой эндпоинт для перепроверки относятся только к WARP: у сервера перехватывается его собственный адрес
+            _isolate.Enabled = _restrict.Enabled = !busy && !_engine.ProxyMode;
+            _timeout.Enabled = _stopAfter.Enabled = !busy;
             int n = _list.SelectedItems.Count;
             _use.Enabled = !busy && n == 1;
             _test.Enabled = !busy && n > 0;

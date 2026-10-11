@@ -26,6 +26,11 @@ namespace Zarp.UI
         readonly DarkButton _reset, _save, _close;
         readonly int _statusHeight;
         bool _loading;
+        // загрузка подписки идёт (кнопка «Сохранить» ждёт) и её последняя неудача: показывается, пока текст в поле не изменили
+        bool _loadingSubscription;
+        readonly System.Threading.CancellationTokenSource _cancel = new System.Threading.CancellationTokenSource();
+        Msg _failure;
+        string _failureFor;
 
         public ConnectionForm(Engine engine) : base(L.T("endpoint.title"))
         {
@@ -42,7 +47,16 @@ namespace Zarp.UI
             _link.AccessibleName = L.T("proxy.link");
             _link.Bounds = new Rectangle(0, proxyHint.Bottom + 8, W, 92);
             _link.MaxLength = 8192;
-            _statusHeight = Math.Max(Note(L.T("proxy.invalid"), Point.Empty, W).Height, Note(L.T("proxy.dnsInvalid"), Point.Empty, W).Height);
+            // одна высота для любой подсказки под ссылкой: самая длинная из возможных (имя в подсказке - до 24 знаков)
+            string longest = new string('W', 24);
+            var reasons = new[] { L.T("proxy.subHttp", "503"), L.T("proxy.subTimeout"), L.T("proxy.subNetwork"), L.T("proxy.subTls"), L.T("proxy.subBig"), L.T("proxy.subRedirect"), L.T("proxy.subEmpty") };
+            _statusHeight = new[]
+            {
+                L.T("proxy.invalid"), L.T("proxy.dnsInvalid"), L.T("proxy.extra"), L.T("proxy.insecure"), L.T("proxy.scheme"),
+                L.T("proxy.param", longest), L.T("proxy.transport", longest), L.T("proxy.security", longest),
+                L.T("proxy.subscription", new string('w', 40)), L.T("proxy.subscriptionKnown", 200, "31.12.2026 23:59"), L.T("proxy.subscriptionLoading"),
+                L.T("proxy.subscriptionHttps"), L.T("proxy.subscriptionUrl"), L.T("proxy.subscriptionEmpty"), L.T("proxy.subscriptionJson"), L.T("proxy.subscriptionHtml"),
+            }.Concat(reasons.Select(r => L.T("proxy.subscriptionFailed", r))).Max(text => Note(text, Point.Empty, W).Height);
             _linkStatus.Bounds = new Rectangle(0, _link.Bottom + 6, W, _statusHeight);
             _linkStatus.AutoSize = false;
             _linkStatus.AutoEllipsis = true;
@@ -124,16 +138,19 @@ namespace Zarp.UI
             _warpPanel.Visible = !proxy;
 
             ProxyProfile.TryParse(_link.Text, out var profile);
+            bool subscription = Subscription.IsUrl(_link.Text);
             bool dnsOk = DnsValid(_dns.Text);
-            if (profile != null && dnsOk)
+            bool failed = _failure != null && _failureFor == _link.Text.Trim();
+            if ((profile != null || subscription) && dnsOk && !failed)
             {
                 _linkStatus.ForeColor = Theme.TextDim;
-                _linkStatus.Text = profile.Title + ": " + profile.Endpoint;
+                _linkStatus.Text = subscription ? SubscriptionStatus() : profile.Title + ": " + profile.Endpoint;
             }
             else
             {
                 _linkStatus.ForeColor = Theme.Bad;
-                _linkStatus.Text = _link.Text.Trim().Length == 0 ? "" : profile == null ? L.T("proxy.invalid") : L.T("proxy.dnsInvalid");
+                _linkStatus.Text = failed ? _failure.ToString() : _link.Text.Trim().Length == 0 ? ""
+                    : profile == null && !subscription ? (ProxySource.Explain(_link.Text) ?? new Msg("proxy.invalid")).ToString() : L.T("proxy.dnsInvalid");
             }
 
             bool endpointsOk = EndpointParser.TryParse(_endpoints.Text, out _);
@@ -144,17 +161,54 @@ namespace Zarp.UI
             var c = _engine.Config;
             bool dirty = _useProxy.Checked != c.UseProxy || _link.Text.Trim() != c.ProxyUri.Trim() || _ipv6.Checked != c.ProxyIpv6
                          || _dns.Text.Trim() != c.ProxyDns || _endpoints.Text.Trim() != c.CustomEndpoints.Trim();
-            _save.Enabled = !_engine.IsBusy && dirty && endpointsOk && (!proxy || (profile != null && dnsOk));
+            // подписку «Сохранить» ещё и загружает заново: так обновляют список серверов, не меняя адрес
+            _save.Enabled = !_engine.IsBusy && !_loadingSubscription && (dirty || (proxy && subscription)) && endpointsOk && (!proxy || ((profile != null || subscription) && dnsOk));
         }
 
-        void Save()
+        /// <summary>Подпись под полем для подписки: что загружается, сколько серверов в сохранённом списке и когда он обновлён.</summary>
+        string SubscriptionStatus()
+        {
+            string url = _link.Text.Trim();
+            if (_loadingSubscription) return L.T("proxy.subscriptionLoading");
+            var snapshot = _engine.SubscriptionSnapshot(url);
+            return snapshot == null
+                ? L.T("proxy.subscription", Subscription.HostOf(url))
+                : L.T("proxy.subscriptionKnown", snapshot.Links.Count, snapshot.Updated.ToLocalTime().ToString("g"));
+        }
+
+        async void Save()
         {
             if (!_save.Enabled) return;
+            string text = _link.Text.Trim();
+            if (_useProxy.Checked && Subscription.IsUrl(text))
+            {
+                // список серверов загружается сразу: так сразу видно, что подписка работает и сколько в ней серверов
+                _loadingSubscription = true;
+                Changed();
+                SubscriptionResult result = null;
+                Msg failure = null;
+                try { result = await _engine.LoadSubscriptionAsync(text, _cancel.Token); }
+                catch (SubscriptionException e) { failure = new Msg("proxy.subscriptionFailed", e.Describe().ToString()); }
+                catch (OperationCanceledException) { return; }
+                catch (Exception) { failure = new Msg("proxy.subscriptionFailed", L.T("proxy.subNetwork")); }
+                finally { _loadingSubscription = false; }
+                if (IsDisposed) return;
+                if (failure == null && result.Servers.Count == 0)
+                    failure = new Msg(result.Json ? "proxy.subscriptionJson" : result.Html ? "proxy.subscriptionHtml" : "proxy.subscriptionEmpty");
+                if (failure != null)
+                {
+                    _failure = failure;
+                    _failureFor = text;
+                    Changed();
+                    return;
+                }
+                _failure = null;
+            }
             var c = _engine.Config;
             c.ProxyIpv6 = _ipv6.Checked;
             c.ProxyDns = _dns.Text.Trim();
-            if (_engine.ApplyConnection(_endpoints.Text, _useProxy.Checked, _link.Text))
-                Changed();
+            _engine.ApplyConnection(_endpoints.Text, _useProxy.Checked, _link.Text);
+            Changed();
         }
 
         void OnEngineChanged()
@@ -166,7 +220,11 @@ namespace Zarp.UI
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) _engine.Changed -= OnEngineChanged;
+            if (disposing)
+            {
+                _engine.Changed -= OnEngineChanged;
+                try { _cancel.Cancel(); } catch (ObjectDisposedException) { }
+            }
             base.Dispose(disposing);
         }
     }

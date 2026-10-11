@@ -97,6 +97,37 @@ static partial class Program
             Check(!ProxyProfile.TryParse(link, out var none) && none == null, "TryParse must refuse: " + link.Replace("my-secret", "***"));
         }
         Check(ProxyProfile.TryParse("  trojan://secret@host:443  ", out _), "Surrounding spaces are ignored");
+
+        // чем именно не подходит ссылка: подсказка называет причину (схему, транспорт, параметр), но не пароль и не значения
+        Msg Why(string link) => ProxyProfile.Explain(link);
+        // XHTTP поддерживается через мост Xray (подробности в TestXhttpProfiles); сам по себе sing-box его не знает
+        string xhttp = "vless://" + TestUuid + "@docs.example:8433?encryption=none&extra=%7B%22mode%22%3A%22auto%22%2C%22xPaddingBytes%22%3A%22100-1000%22%7D&mode=auto&path=%2F&security=tls&type=xhttp";
+        Check(Why(xhttp) == null && ProxyProfile.Parse(xhttp).UsesXray, "A link with XHTTP is accepted and goes through the Xray bridge");
+        Check(Why("vless://" + TestUuid + "@docs.example:443?type=SplitHTTP")?.Key == "proxy.transport" &&
+              Why("vless://" + TestUuid + "@docs.example:443?security=tls&extra=%7B%7D")?.Key == "proxy.param", "The old name of XHTTP and an extra parameter without XHTTP are named as unsupported");
+        foreach (var scheme in new[] { "vmess://abc", "ss://abc", "https://example.com", "socks5://u:p@h:1", "not a link" })
+            Check(Why(scheme)?.Key == "proxy.scheme", "Another kind of link is explained by the accepted schemes: '" + scheme + "'");
+        var transportHint = Why("trojan://secret@host:443?type=kcp");
+        Check(transportHint?.Key == "proxy.transport" && (string)transportHint.Args[0] == "kcp" && (Why("trojan://secret@host:443?type=h2")?.Args[0] as string) == "h2" &&
+              Why("hy2://secret@host:443?type=ws")?.Key == "proxy.transport", "An unsupported transport is named");
+        var paramHint = Why("trojan://secret@host:443?headerType=http");
+        Check(paramHint?.Key == "proxy.param" && (string)paramHint.Args[0] == "headerType", "An unsupported parameter is named");
+        var securityHint = Why("vless://" + TestUuid + "@host:443?security=xtls");
+        Check(securityHint?.Key == "proxy.security" && (string)securityHint.Args[0] == "xtls", "An unsupported security mode is named");
+        var flowHint = Why("vless://" + TestUuid + "@host:443?security=tls&type=tcp&flow=xtls-rprx-direct");
+        Check(flowHint?.Key == "proxy.param" && (string)flowHint.Args[0] == "flow", "An unsupported flow is named as a parameter");
+        foreach (var other in new[] { "trojan://my-secret@host:99999", "vless://nope", "trojan://my-secret@host:443/path", "trojan://my-secret@host:443?flow=xtls-rprx-vision&type=ws" })
+            Check(Why(other) != null && (Why(other).Key == "proxy.invalid" || Why(other).Key == "proxy.param"), "Other mistakes keep the general explanation or name a parameter: " + other.Replace("my-secret", "***"));
+        Check(Why("trojan://secret@host:443") == null && Why("vless://" + TestUuid + "@host:443?security=tls&type=ws&path=/a") == null, "A good link has no explanation");
+        // имена, похожие на кусок пароля, не показываются
+        foreach (var link in new[] { "trojan://my-secret@host:443?type=" + new string('s', 40), "trojan://my-secret@host:443?" + new string('s', 40) + "=1", "trojan://my-secret@host:443?type=pa$$word" })
+        {
+            var hint = Why(link);
+            Check(hint != null && hint.Args.Length == 1 && (string)hint.Args[0] == "?" && !hint.ToString().Contains("secret"), "A value that does not look like a name is not echoed: " + (hint == null ? "no hint" : hint.ToString()));
+        }
+        // сообщение исключения остаётся прежним, причина лежит отдельно и без секретов
+        var failure2 = Catch(() => ProxyProfile.Parse("trojan://my-secret@host:443?type=kcp")) as ProxyLinkException;
+        Check(failure2 != null && failure2.Message == "proxy.invalid" && failure2.Reason == "transport:kcp" && !failure2.Reason.Contains("secret"), "The exception keeps its message and carries a safe reason");
     }
 
     static ProxySession TestSession(ProxyProfile profile, bool tun) => new ProxySession
@@ -295,6 +326,15 @@ static partial class Program
             "hy2://secret@proxy.example",
             "hysteria2://secret@proxy.example:8443/?sni=front.example&alpn=h3&obfs=salamander&obfs-password=key&insecure=1",
         };
+        // со списком ECH, настоящим: sing-box разбирает его при проверке конфигурации
+        string echList = Uri.EscapeDataString(EchKeys(box).ConfigBase64);
+        links = links.Concat(new[]
+        {
+            "trojan://secret@proxy.example:443?sni=front.example&ech=" + echList,
+            "vless://" + TestUuid + "@proxy.example:443?security=tls&sni=front.example&fp=chrome&alpn=h2&ech=" + echList,
+            "vless://" + TestUuid + "@proxy.example:443?security=tls&type=ws&path=%2Fws&host=front.example&ech=" + echList,
+            "hysteria2://secret@proxy.example:5443?alpn=h3&ech=" + echList + "&fp=firefox&obfs=salamander&obfs-password=key&security=tls&sni=docs.example",
+        }).ToArray();
         foreach (var link in links)
         foreach (bool tun in new[] { false, true })
         {
@@ -424,9 +464,9 @@ static partial class Program
         public void Dispose() => Tcp.Close();
     }
 
-    static string HttpThroughSocks(int socksPort, int targetPort)
+    static string HttpThroughSocks(int socksPort, int targetPort, string user = "zarp", string password = "pw")
     {
-        using (var session = new Socks5Session(socksPort, "zarp", "pw"))
+        using (var session = new Socks5Session(socksPort, user, password))
         {
             var reply = session.Request(1, IPAddress.Loopback, targetPort);
             if (reply.Reply != 0) throw new IOException("CONNECT failed with " + reply.Reply);
@@ -487,7 +527,7 @@ static partial class Program
         }
     }
 
-    static string UdpThroughSocks(int socksPort)
+    static string UdpThroughSocks(int socksPort, string user = "zarp", string password = "pw")
     {
         using (var echo = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0)))
         {
@@ -502,7 +542,7 @@ static partial class Program
                 catch { }
             }) { IsBackground = true };
             echoer.Start();
-            using (var session = new Socks5Session(socksPort, "zarp", "pw"))
+            using (var session = new Socks5Session(socksPort, user, password))
             {
                 var reply = session.Request(3, IPAddress.Any, 0);
                 if (reply.Reply != 0) throw new IOException("UDP ASSOCIATE failed with " + reply.Reply);
@@ -531,9 +571,21 @@ static partial class Program
         return port;
     }
 
+    /// <summary>
+    /// Свободный UDP-порт. Списки портов, которые Windows держит в резерве (Hyper-V, WinNAT, Docker), для TCP и UDP разные: порт,
+    /// свободный для TCP, нередко запрещён для UDP, и сервер на QUIC (Hysteria2) на нём не запустится.
+    /// </summary>
+    static int FreeUdpPort()
+    {
+        using (var udp = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0)))
+            return ((IPEndPoint)udp.Client.LocalEndPoint).Port;
+    }
+
     sealed class LoopbackServer : IDisposable
     {
         public string Link;
+        /// <summary>ECHConfigList сервера в base64, если у него включён ECH.</summary>
+        public string Ech;
         public Process Process;
         public readonly StringBuilder Log = new StringBuilder();
 
@@ -567,7 +619,7 @@ static partial class Program
         File.WriteAllText(Path.Combine(dir, "cert.pem"), cert.Replace("\r", ""));
         File.WriteAllText(Path.Combine(dir, "key.pem"), key.Replace("\r", ""));
 
-        int serverPort = FreeTcpPort();
+        int serverPort = protocol == "hysteria2" ? FreeUdpPort() : FreeTcpPort(); // Hysteria2 слушает UDP
         var user = protocol == "vless"
             ? new Dictionary<string, object> { ["name"] = "u", ["uuid"] = TestUuid }
             : new Dictionary<string, object> { ["name"] = "u", ["password"] = "test-password" };
@@ -579,7 +631,7 @@ static partial class Program
                 ["enabled"] = true, ["certificate_path"] = Path.Combine(dir, "cert.pem"), ["key_path"] = Path.Combine(dir, "key.pem"),
             },
         };
-        string link;
+        string link, result_ech = null;
         switch (variant)
         {
             case "vless": link = "vless://" + TestUuid + "@127.0.0.1:" + serverPort + "?security=tls&sni=localhost&allowInsecure=1"; break;
@@ -600,6 +652,24 @@ static partial class Program
                 inbound["transport"] = new Dictionary<string, object> { ["type"] = "httpupgrade", ["path"] = "/up" };
                 link = "vless://" + TestUuid + "@127.0.0.1:" + serverPort + "?security=tls&sni=localhost&allowInsecure=1&type=httpupgrade&path=%2Fup&host=localhost";
                 break;
+            // ECH: ключи на сервере, конфигурация (то, что публикуют серверы) в ссылке; внешнее имя в конфигурации - другое
+            case "trojan-ech":
+            case "vless-ech":
+            case "hysteria2-ech":
+                {
+                    var keys = EchKeys(box);
+                    ((Dictionary<string, object>)inbound["tls"])["ech"] = new Dictionary<string, object> { ["enabled"] = true, ["key"] = keys.KeyLines };
+                    result_ech = keys.ConfigBase64;
+                    string query = "sni=localhost&ech=" + Uri.EscapeDataString(keys.ConfigBase64);
+                    if (protocol == "vless") link = "vless://" + TestUuid + "@127.0.0.1:" + serverPort + "?security=tls&allowInsecure=1&fp=chrome&" + query;
+                    else if (protocol == "trojan") link = "trojan://test-password@127.0.0.1:" + serverPort + "?allowInsecure=1&" + query;
+                    else
+                    {
+                        inbound["obfs"] = new Dictionary<string, object> { ["type"] = "salamander", ["password"] = "obfs-key" };
+                        link = "hy2://test-password@127.0.0.1:" + serverPort + "/?alpn=h3&fp=firefox&insecure=1&obfs=salamander&obfs-password=obfs-key&security=tls&" + query;
+                    }
+                    break;
+                }
             default: throw new ArgumentException(variant);
         }
         var server = new Dictionary<string, object>
@@ -623,10 +693,20 @@ static partial class Program
         var serverCheck = SingBoxRun(box, "check -c \"" + serverConfig + "\"");
         Check(serverCheck.Ok, "The test server configuration must be valid:\n" + serverCheck.Output);
 
-        var result = new LoopbackServer { Link = link };
+        var result = new LoopbackServer { Link = link, Ech = result_ech };
         result.Process = StartSingBoxServer(serverExe, serverConfig, dir, result.Log);
         lock (result.Log) Check(!result.Process.HasExited && result.Log.ToString().Contains("sing-box started"), "The test server must start:\n" + result.Log);
         return result;
+    }
+
+    /// <summary>Пара ECH от `sing-box generate ech-keypair`: ConfigBase64 - то, что кладут в ссылку (ech=), KeyLines - то, что читает сервер.</summary>
+    static (string ConfigBase64, List<string> KeyLines) EchKeys(SingBox box)
+    {
+        var pem = SingBoxRun(box, "generate ech-keypair docs.example.net").Output.Replace("\r", "");
+        var configs = System.Text.RegularExpressions.Regex.Match(pem, "-----BEGIN ECH CONFIGS-----\n(.*?)\n-----END ECH CONFIGS-----", System.Text.RegularExpressions.RegexOptions.Singleline);
+        var keys = System.Text.RegularExpressions.Regex.Match(pem, "-----BEGIN ECH KEYS-----.*?-----END ECH KEYS-----", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Check(configs.Success && keys.Success, "sing-box must generate an ECH key pair: " + pem);
+        return (configs.Groups[1].Value.Replace("\n", ""), keys.Value.Split('\n').ToList());
     }
 
     /// <summary>
@@ -659,6 +739,36 @@ static partial class Program
     });
 
     /// <summary>
+    /// ECH из ссылки действительно используется: сервер с ключами ECH пускает клиента с его конфигурацией (TestSingBoxLoopback[...-ech]),
+    /// а клиента с чужой не пускает. Без этого проверка выше могла бы пройти и с потерянным ech.
+    /// </summary>
+    static void TestEchIsEnforced() => WithEmbeddedSingBox(box =>
+    {
+        foreach (var variant in new[] { "trojan-ech", "vless-ech", "hysteria2-ech" })
+        using (var web = new FakeServer(new byte[1024]))
+        using (var server = StartLoopbackServer(box, variant))
+        {
+            try
+            {
+                Check(!string.IsNullOrEmpty(server.Ech), variant + ": the test server has ECH");
+                string spoiled = server.Link.Replace(Uri.EscapeDataString(server.Ech), Uri.EscapeDataString(EchKeys(box).ConfigBase64));
+                Check(spoiled != server.Link, variant + ": the link must change");
+                var session = TestSession(ProxyProfile.Parse(spoiled), false);
+                session.Address = "127.0.0.1";
+                session.Port = FreeTcpPort();
+                var err = StartSingBoxClient(box, ProxyConfig.Build(session), session.Port);
+                Check(err == null, variant + ": the client must start: " + err);
+                int webPort = int.Parse(web.Url("/").Split(':')[2].TrimEnd('/'));
+                string response;
+                try { response = HttpThroughSocks(session.Port, webPort); }
+                catch (IOException) { response = ""; }
+                Check(!response.StartsWith("HTTP/1.1 200") && web.Requests == 0, variant + ": a wrong ECH configuration must break the connection, got '" + (response.Length > 40 ? response.Substring(0, 40) : response) + "'");
+            }
+            finally { box.Stop(); }
+        }
+    });
+
+    /// <summary>
     /// Проверка соединения (ProxyRuntime.MeasureAsync) через проверочный вход настоящего sing-box (SOCKS5 с паролем): запросы
     /// идут через сервер до страницы на localhost, интернет не нужен. До страницы идут по имени, которое разрешает сервер, как
     /// в программе; сам разбор ответов проверяет TestProbeClient.
@@ -685,7 +795,14 @@ static partial class Program
                     "One warm-up and two samples must reach the page through the server: ok=" + good.Ok + ", first=" + good.FirstMs + ", ping=" + good.PingMs +
                     ", requests=" + web.Requests + ", failed=" + good.Failed + ", last error=" + good.Error);
 
+                // один запрос (им поиск по парам отсеивает неработающие): настоящий ответ - успех со временем, остальное - отказ с причиной
+                int requests = web.Requests;
+                var probe = Sync(() => runtime.ProbeAsync(session, 10000, CancellationToken.None));
+                Check(probe.Ok && probe.FirstMs >= 1 && probe.Failed == 0 && web.Requests == requests + 1, "One request that reaches the page is a success: ok=" + probe.Ok + ", first=" + probe.FirstMs + ", requests " + requests + " -> " + web.Requests);
+
                 SetPrivate(runtime, "TraceUrl", Named(web.Url("/portal")));
+                var portalProbe = Sync(() => runtime.ProbeAsync(session, 10000, CancellationToken.None));
+                Check(!portalProbe.Ok && portalProbe.Error == "trace" && portalProbe.Failed == 1 && portalProbe.FirstMs == 0, "One request to a stub page is a failure with its reason, got " + portalProbe.Error);
                 var portal = Sync(() => runtime.MeasureAsync(session, 1, 10000, CancellationToken.None));
                 Check(!portal.Ok && portal.Error == "trace", "A 200 page without the ip field (a provider's stub) is not a successful check, got " + portal.Error);
 
@@ -698,6 +815,8 @@ static partial class Program
                 var wrong = new ProxySession { Profile = session.Profile, Port = session.Port, User = session.User, Password = "wrong" };
                 var refused = Sync(() => runtime.MeasureAsync(wrong, 1, 5000, CancellationToken.None));
                 Check(!refused.Ok && refused.Failed == 2, "A wrong password fails every request of the check, got ok=" + refused.Ok + ", failed=" + refused.Failed + ", " + refused.Error);
+                var refusedProbe = Sync(() => runtime.ProbeAsync(wrong, 5000, CancellationToken.None));
+                Check(!refusedProbe.Ok && refusedProbe.Failed == 1 && !string.IsNullOrEmpty(refusedProbe.Error), "and the one request of the search fails too, got " + refusedProbe.Error);
                 Check(Catch(() => new Socks5Session(session.Port, session.User, "wrong")) is IOException, "The probe port must refuse a wrong password over SOCKS5");
                 Check(Catch(() => SocksWithoutPassword(session.Port)) is IOException, "The probe port must refuse a client that offers no password");
                 string viaHttp = RawProxyGet(session.Port, session.User, session.Password, Named(web.Url("/trace")));

@@ -33,6 +33,14 @@
     <Warning Text="vendor\singbox.zip не найден, sing-box не будет вшит в exe. Запустите tools\fetch-singbox.ps1." />
   </Target>
 
+  <!-- Xray (мост для VLESS поверх XHTTP, который sing-box не умеет) вшивается так же; архив готовит tools\fetch-xray.ps1. Без него ссылки с XHTTP недоступны. -->
+  <ItemGroup Condition="Exists('..\..\vendor\xray.zip')">
+    <EmbeddedResource Include="..\..\vendor\xray.zip" LogicalName="xray.zip" />
+  </ItemGroup>
+  <Target Name="WarnNoXray" BeforeTargets="Build" Condition="!Exists('..\..\vendor\xray.zip')">
+    <Warning Text="vendor\xray.zip не найден, Xray не будет вшит в exe. Запустите tools\fetch-xray.ps1." />
+  </Target>
+
   <!-- лицензии Zarp и вшитых компонентов: едут внутри exe и распаковываются в %LOCALAPPDATA%\Zarp\licenses -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\LICENSE" LogicalName="licenses/LICENSE.txt" />

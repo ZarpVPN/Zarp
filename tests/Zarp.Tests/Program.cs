@@ -35,6 +35,7 @@ static partial class Program
         // Isolate UI tests from embedded driver extraction, WARP, and background downloads.
         typeof(Zapret).GetField("_embeddedVersion", BindingFlags.NonPublic | BindingFlags.Static).SetValue(null, "");
         typeof(SingBox).GetField("_embeddedVersion", BindingFlags.NonPublic | BindingFlags.Static).SetValue(null, "");
+        typeof(Xray).GetField("_embeddedVersion", BindingFlags.NonPublic | BindingFlags.Static).SetValue(null, "");
         // Tests must never find, start or install the real Cloudflare WARP: the search always comes back empty
         // (individual tests substitute their own results).
         typeof(Warp).GetField("Finder", PrivateStatic).SetValue(null, (Func<WarpLocator.Result>)Missing);
@@ -379,12 +380,32 @@ static partial class Program
                     }
                     SaveImage(connection, "connection-" + code + ".png");
                     SetChecked(useProxy, true);
-                    foreach (string text in new[] { "", "x", "trojan://secret@proxy.example:443" })
+                    // каждое из сообщений под ссылкой, включая самые длинные (имя в подсказке до 24 знаков)
+                    string longest = new string('w', 24);
+                    foreach (string text in new[]
+                    {
+                        "", "x", "vless://nope", "trojan://secret@proxy.example:443",
+                        "vless://" + TestUuid + "@h.example:443?type=xhttp", "vless://" + TestUuid + "@h.example:443?type=xhttp&extra=nope",
+                        "vless://" + TestUuid + "@h.example:443?security=tls&type=xhttp&allowInsecure=1", "trojan://s@h.example:443?type=" + longest,
+                        "trojan://s@h.example:443?" + longest + "=1", "trojan://s@h.example:443?security=" + longest,
+                        // подписки: адрес с очень длинным именем сайта, адреса, которые не принимаются
+                        "https://" + new string('w', 40) + ".example/sub", "http://panel.example/sub", "https://user:pass@panel.example/sub",
+                    })
                     {
                         link.Text = text;
                         Application.DoEvents();
                         CheckLayout(connection, code + " (server, \"" + text + "\")");
                     }
+                    // сообщения о подписке, которые появляются после загрузки (их текст нельзя получить, не загружая): все они влезают под ссылкой
+                    var linkStatus = GetPrivate<Label>(connection, "_linkStatus");
+                    var subscriptionMessages = new[]
+                    {
+                        L.T("proxy.subscriptionLoading"), L.T("proxy.subscriptionKnown", 200, "31.12.2026 23:59"), L.T("proxy.subscriptionJson"), L.T("proxy.subscriptionHtml"), L.T("proxy.subscriptionEmpty"),
+                    }.Concat(new[] { L.T("proxy.subHttp", "503"), L.T("proxy.subTimeout"), L.T("proxy.subNetwork"), L.T("proxy.subTls"), L.T("proxy.subBig"), L.T("proxy.subRedirect"), L.T("proxy.subEmpty") }
+                        .Select(reason => L.T("proxy.subscriptionFailed", reason)));
+                    foreach (var message in subscriptionMessages)
+                        Check(TextRenderer.MeasureText(message, linkStatus.Font, new System.Drawing.Size(linkStatus.Width, int.MaxValue), TextFormatFlags.WordBreak).Height <= linkStatus.Height,
+                            code + ": the message must fit under the link: " + message);
                     SaveImage(connection, "connection-server-" + code + ".png");
                 }
                 // маршрутизация, пресеты, базы GeoIP/GeoSite и выбор программ: раскладка во всех языках, в обоих режимах

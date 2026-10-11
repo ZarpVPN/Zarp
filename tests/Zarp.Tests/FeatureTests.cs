@@ -72,10 +72,14 @@ static partial class Program
         Check(StrategyFilter.Apply(new[] { plain }, "ru").Count == 0 && StrategyFilter.Apply(new[] { plain }, "all").Count == 1,
             "The list filter and the single-strategy check must agree about plain WARP");
 
-        // собственный сервер фильтр не касается
-        Check(ProxyProfile.TryParse("trojan://secret@proxy.example:443", out var profile) && StrategyFilter.Apply(new[] { profile.ToStrategy() }, "cn").Count == 1 &&
-              StrategyFilter.Matches(profile.ToStrategy(), "cn") && StrategyFilter.Matches(profile.ToStrategy(), "ru,ir"),
-            "A custom server is never filtered by country");
+        // пара «стратегия + сервер» проходит фильтр по метке стратегии: у сервера страны нет
+        Check(ProxyProfile.TryParse("trojan://secret@proxy.example:443", out var profile), "Setup: a server");
+        var pairs = ServerPairs.Build(all, new[] { profile.ToStrategy() });
+        Check(pairs.Count > 0 && StrategyFilter.Apply(pairs, "all").Count == pairs.Count, "Under All every pair is listed");
+        Check(StrategyFilter.Apply(pairs, "cn").Count > 0 && StrategyFilter.Apply(pairs, "cn").Count < pairs.Count && !StrategyFilter.Apply(pairs, "cn").Any(p => p.Args.Contains("vk") || p.Args.Contains("gosuslugi")) &&
+              StrategyFilter.Apply(pairs, "ru").Any(p => p.Args.Contains("vk")),
+            "The pairs of a server follow the country tags of their strategies");
+        Check(!StrategyFilter.Matches(profile.ToStrategy(), "cn") && StrategyFilter.Matches(profile.ToStrategy(), "all"), "A bare server without a strategy has nothing to match a country with");
 
         // страны назначаются своим стратегиям четвёртым полем
         var engine = NewEngine();
@@ -194,11 +198,32 @@ static partial class Program
         Check(WinDivertSyntaxError(dll, "ip.DstAddr==") != null, "The syntax check itself must reject a broken filter");
     });
 
-    /// <summary>Подмена winws2: процесс, который просто живёт, чтобы движок считал, что zapret2 запущен.</summary>
+    static string _sleepingWinws;
+
+    /// <summary>Подмена winws2: программа, которая просто живёт. Собирается один раз за случай, дальше копируется.</summary>
+    static string SleepingWinws() => _sleepingWinws ?? (_sleepingWinws = CompileRegression(Path.Combine(_data, "sleeping-winws"), "winws2.exe",
+        "class P { static void Main() { System.Threading.Thread.Sleep(60000); } }"));
+
+    /// <summary>Подмена winws2 в движке: процесс, который просто живёт, чтобы движок считал, что zapret2 запущен.</summary>
     static void UseSleepingWinws(Engine engine, string folder)
     {
-        string sleeper = CompileRegression(folder, "winws2.exe", "class P { static void Main() { System.Threading.Thread.Sleep(60000); } }");
-        File.Copy(sleeper, engine.Zapret.Exe, true);
+        File.Copy(SleepingWinws(), engine.Zapret.Exe, true);
+    }
+
+    /// <summary>
+    /// Подставные winws2 к концу случая остановлены: иначе они держат папку данных (до минуты) и мешают её удалить.
+    /// Трогаются только программы из папки данных этого случая, настоящий winws2 пользователя - никогда.
+    /// </summary>
+    static void StopTestWinws()
+    {
+        if (_data == null) return;
+        foreach (var process in Process.GetProcessesByName("winws2"))
+            using (process)
+            {
+                string path = ProcessUtil.GetProcessPath(process);
+                if (path == null || !path.StartsWith(_data, StringComparison.OrdinalIgnoreCase)) continue;
+                try { process.Kill(); process.WaitForExit(3000); } catch { }
+            }
     }
 
     static async Task TestCountryFilterInEngineAsync()

@@ -37,6 +37,18 @@ namespace Zarp.Core
         /// проверить настоящим sing-box без изменения сети. В программе проверка всегда идёт через сервер.
         /// </summary>
         public bool RulesOnProbe;
+        /// <summary>
+        /// Только для серверов с XHTTP (Profile.UsesXray): порт моста Xray на 127.0.0.1 и учётные данные его SOCKS5-входа.
+        /// sing-box отправляет трафик в мост, а мост - серверу.
+        /// </summary>
+        public int XrayPort;
+        public string XrayUser;
+        public string XrayPassword;
+        /// <summary>
+        /// Полный путь к xray.exe. Его собственное подключение к серверу не должно попадать в адаптер Zarp, иначе
+        /// получится петля: оно идёт мимо прокси правилом по пути программы, а адрес сервера ещё и исключён из маршрутов адаптера.
+        /// </summary>
+        public string XrayPath;
     }
 
     /// <summary>Сборка конфигурации sing-box 1.13 из параметров сессии. Конфигурацию целиком составляет Zarp, чужая не принимается.</summary>
@@ -72,13 +84,22 @@ namespace Zarp.Core
             bool userRules = s.Rules != null && s.Rules.Count > 0;
             string strategy = s.Ipv6 ? "prefer_ipv4" : "ipv4_only";
 
+            bool bridge = s.Profile.UsesXray;
+            if (bridge && (s.XrayPort <= 0 || string.IsNullOrEmpty(s.XrayUser) || string.IsNullOrEmpty(s.XrayPassword)))
+                throw new InvalidOperationException("The Xray bridge needs a port and a login");
+
             var inbounds = new List<object>();
             if (s.Tun)
             {
                 var addresses = new List<string> { "172.19.0.1/30", "fdfe:dcba:9876::1/126" };
                 // Стек gVisor целиком в процессе sing-box: ему не нужны слушающие сокеты на адаптере и правила брандмауэра.
-                inbounds.Add(Rule("type", "tun", "tag", "tun-in", "interface_name", SingBox.TunName,
-                    "address", addresses, "auto_route", true, "strict_route", true, "stack", "gvisor"));
+                var tun = Rule("type", "tun", "tag", "tun-in", "interface_name", SingBox.TunName,
+                    "address", addresses, "auto_route", true, "strict_route", true, "stack", "gvisor");
+                // Свои соединения sing-box привязывает к сетевой карте сам (auto_detect_interface), а Xray - нет: к серверу он идёт
+                // по таблице маршрутов, поэтому адрес сервера выводится из маршрутов адаптера (второй заслон после правила по пути).
+                if (bridge && IPAddress.TryParse(s.Address ?? s.Profile.Host, out var server))
+                    tun["route_exclude_address"] = new List<string> { server + (server.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork ? "/32" : "/128") };
+                inbounds.Add(tun);
             }
             // только SOCKS5 с паролем: вход HTTP-прокси при ошибке входа закрывает соединение сбросом (см. ProbeClient)
             inbounds.Add(Rule("type", "socks", "tag", Probe, "listen", "127.0.0.1", "listen_port", s.Port,
@@ -89,6 +110,9 @@ namespace Zarp.Core
             if (!s.RulesOnProbe) rules.Add(Rule("inbound", new List<object> { Probe }, "action", "route", "outbound", "proxy"));
             if (s.Tun || s.RulesOnProbe)
             {
+                // мост Xray ходит к серверу напрямую, что бы ни говорили правила пользователя: иначе его трафик вернётся в туннель
+                if (bridge && !string.IsNullOrEmpty(s.XrayPath))
+                    rules.Add(Rule("process_path_regex", new List<string> { AppPattern(s.XrayPath) }, "action", "route", "outbound", "direct"));
                 if (s.AppPaths != null && !string.IsNullOrEmpty(s.OwnPath))
                     rules.Add(Rule("process_path_regex", new List<string> { AppPattern(s.OwnPath) }, "action", "route", "outbound", "proxy"));
                 if (s.AppPaths != null)
@@ -120,7 +144,7 @@ namespace Zarp.Core
                 "inbounds", inbounds,
                 "outbounds", new List<object>
                 {
-                    s.Profile.BuildOutbound(s.Address),
+                    bridge ? ProxyProfile.BuildBridgeOutbound(s.XrayPort, s.XrayUser, s.XrayPassword) : s.Profile.BuildOutbound(s.Address),
                     Rule("type", "direct", "tag", "direct", "domain_resolver", "bootstrap"),
                 },
                 "route", Rule("auto_detect_interface", true, "default_domain_resolver", "remote", "final", "proxy", "rules", rules));

@@ -48,13 +48,13 @@ namespace Zarp.Core
         }
 
         /// <summary>
-        /// Стратегия проходит фильтр. Собственный сервер (не WARP) фильтр не касается. Пока выбрана страна,
-        /// стратегии без обхода (WARP как есть) и без метки страны исключаются: они остаются только при «all».
+        /// Стратегия проходит фильтр. Пока выбрана страна, стратегии без обхода (WARP как есть) и без метки страны исключаются:
+        /// они остаются только при «all». Пара «стратегия + сервер» проходит по метке своей стратегии: сервер страны не имеет.
         /// </summary>
         public static bool Matches(Strategy strategy, string value) => Matches(strategy, Selected(value));
 
         static bool Matches(Strategy strategy, HashSet<string> selected) =>
-            strategy.IsProxy || selected.Count == 0 || (strategy.UsesZapret && strategy.Countries.Any(selected.Contains));
+            selected.Count == 0 || (strategy.UsesZapret && strategy.Countries.Any(selected.Contains));
 
         public static List<Strategy> Apply(IEnumerable<Strategy> strategies, string value)
         {

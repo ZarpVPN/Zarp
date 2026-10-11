@@ -57,6 +57,14 @@ static partial class Program
         foreach (bool restrict in new[] { true, false })
         foreach (var strategy in StrategyCatalog.BuiltInStrategies.Where(s => s.UsesZapret))
             Add($"TestStrategyDryRun[{strategy.Id},restrict={restrict}]", () => TestStrategyDryRun(strategy, restrict));
+        foreach (bool ipv6 in new[] { false, true })
+        foreach (var strategy in StrategyCatalog.BuiltInStrategies.Where(s => s.UsesZapret))
+            Add($"TestServerStrategyDryRun[{strategy.Id},ipv6={ipv6}]", () => TestServerStrategyDryRun(strategy, ipv6));
+        Add(nameof(TestServerPairs), TestServerPairs);
+        Add(nameof(TestServerTargetArgs), TestServerTargetArgs);
+        Add(nameof(TestServerTargetFilters), TestServerTargetFilters);
+        Add(nameof(TestServerZapretLifecycleAsync), () => Wait(TestServerZapretLifecycleAsync));
+        Add(nameof(TestServerZapretPrepareAsync), () => Wait(TestServerZapretPrepareAsync));
         Add(nameof(TestMissingStrategyBlob), TestMissingStrategyBlob);
         Add(nameof(TestStrategyLuaSymbols), TestStrategyLuaSymbols);
         Add(nameof(TestRestoreEmbeddedFiles), TestRestoreEmbeddedFiles);
@@ -79,6 +87,17 @@ static partial class Program
         Add(nameof(TestAppsForm), TestAppsForm);
         Add(nameof(TestProxyProfiles), TestProxyProfiles);
         Add(nameof(TestProxyConfig), TestProxyConfig);
+        Add(nameof(TestXhttpProfiles), TestXhttpProfiles);
+        Add(nameof(TestXrayConfig), TestXrayConfig);
+        Add(nameof(TestLinkExtras), TestLinkExtras);
+        Add(nameof(TestSubscriptionParsing), TestSubscriptionParsing);
+        Add(nameof(TestSubscriptionDownloadAsync), () => Wait(TestSubscriptionDownloadAsync));
+        Add(nameof(TestSubscriptionCache), TestSubscriptionCache);
+        Add(nameof(TestSubscriptionRealHttpsAsync), () => Wait(TestSubscriptionRealHttpsAsync));
+        Add(nameof(TestSubscriptionEngineAsync), () => Wait(TestSubscriptionEngineAsync));
+        Add(nameof(TestSubscriptionRefreshAsync), () => Wait(TestSubscriptionRefreshAsync));
+        Add(nameof(TestSubscriptionAdoptionAsync), () => Wait(TestSubscriptionAdoptionAsync));
+        Add(nameof(TestConnectionFormSubscription), TestConnectionFormSubscription);
         Add(nameof(TestProxyModeEngineAsync), () => Wait(TestProxyModeEngineAsync));
         Add(nameof(TestProxyModeFailuresAsync), () => Wait(TestProxyModeFailuresAsync));
         Add(nameof(TestProxyModeWindows), TestProxyModeWindows);
@@ -89,8 +108,23 @@ static partial class Program
         Add(nameof(TestProbeClient), TestProbeClient);
         Add(nameof(TestProxyMeasure), TestProxyMeasure);
         Add(nameof(TestSingBoxTamper), TestSingBoxTamper);
+        Add(nameof(TestEchIsEnforced), TestEchIsEnforced);
+        Add(nameof(TestXrayEchIsEnforced), TestXrayEchIsEnforced);
+        Add(nameof(TestShortenXray), TestShortenXray);
+        Add(nameof(TestXrayLog), TestXrayLog);
+        Add(nameof(TestTcpTable), TestTcpTable);
+        Add(nameof(TestXrayFailureReasons), TestXrayFailureReasons);
+        Add(nameof(TestXrayConfigsAccepted), TestXrayConfigsAccepted);
+        Add(nameof(TestXrayTamper), TestXrayTamper);
+        Add(nameof(TestXrayLifecycle), TestXrayLifecycle);
+        Add(nameof(TestXrayDiagnostics), TestXrayDiagnostics);
+        Add(nameof(TestXhttpEngineAsync), () => Wait(TestXhttpEngineAsync));
+        foreach (var variant in new[] { "none", "packet-up", "tls-stream-up", "tls-stream-one", "tls-extra", "tls-padding", "tls-ech", "reality", "reality-stream-up" })
+            Add($"TestXrayLoopback[{variant}]", () => TestXrayLoopback(variant));
         tests.Add(new TestCase { Name = nameof(TestRoutingEndToEnd), Body = TestRoutingEndToEnd, TimeoutMs = 240000 });
-        foreach (var variant in new[] { "vless", "trojan", "hysteria2", "vless-ws", "trojan-grpc", "vless-httpupgrade" })
+        // ручной: с настоящим адаптером и настоящим сервером; без ZARP_REAL_ADAPTER_LINK всегда пропускается (docs/testing.md)
+        tests.Add(new TestCase { Name = nameof(TestRealAdapterAsync), Body = () => Wait(TestRealAdapterAsync), TimeoutMs = 900000 }); // дольше срока стража внутри теста (14 минут): иначе раннер убил бы процесс раньше, чем страж остановит туннель
+        foreach (var variant in new[] { "vless", "trojan", "hysteria2", "vless-ws", "trojan-grpc", "vless-httpupgrade", "trojan-ech", "vless-ech", "hysteria2-ech" })
             Add($"TestSingBoxLoopback[{variant}]", () => TestSingBoxLoopback(variant));
         Add(nameof(TestForeignVpnPolicy), TestForeignVpnPolicy);
         Add(nameof(TestDialog), TestDialog);
@@ -188,6 +222,7 @@ static partial class Program
             { file = SourcePath(assertion.File); line = assertion.Line; }
             Console.Error.WriteLine(details);
         }
+        StopTestWinws();
         new XElement("result", new XAttribute("name", test.Name), new XAttribute("status", status),
             new XAttribute("checks", _passed), new XAttribute("file", file), new XAttribute("line", line),
             new XElement("details", XmlText(details))).Save(Path.Combine(_artifacts, "result.xml"));

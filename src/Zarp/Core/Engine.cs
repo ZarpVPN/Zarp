@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -11,7 +12,8 @@ namespace Zarp.Core
 
     /// <summary>
     /// Связывает WARP и zapret2: поиск стратегии, подключение, отключение.
-    /// Если в настройках включён собственный сервер, вместо WARP подключается он (через sing-box).
+    /// Если в настройках включён собственный сервер, вместо WARP подключается он (через sing-box), а zapret2 проводит
+    /// соединение с ним через DPI: стратегия этого режима - пара «стратегия zapret2 + сервер».
     /// </summary>
     public sealed class Engine
     {
@@ -20,9 +22,11 @@ namespace Zarp.Core
         public Warp Warp { get; } = new Warp();
         public Zapret Zapret { get; }
         public SingBox SingBox { get; }
+        /// <summary>Мост для серверов с XHTTP: sing-box такой транспорт не умеет. Нужен и распаковывается, только если он есть в ссылке.</summary>
+        public Xray Xray { get; }
         /// <summary>Базы GeoIP и GeoSite для правил маршрутизации.</summary>
         public GeoData Geo { get; }
-        /// <summary>Все стратегии: встроенные и свои, либо единственный собственный сервер.</summary>
+        /// <summary>Все стратегии: встроенные и свои, либо (со своим сервером) пары «стратегия + сервер».</summary>
         public List<Strategy> Strategies { get; private set; }
 
         public EngineState State { get; private set; } = EngineState.Idle;
@@ -74,8 +78,16 @@ namespace Zarp.Core
         CancellationTokenSource _observation;
         /// <summary>Работающее подключение через собственный сервер (null, если его нет).</summary>
         ProxySession _proxy;
-        /// <summary>Адрес сервера, разрешённый в начале текущей операции (имя разрешается один раз).</summary>
-        string _proxyAddress;
+        /// <summary>Адреса серверов, разрешённые в текущей операции: имя каждого сервера разрешается один раз (серверов много, если это подписка, а пар ещё больше).</summary>
+        readonly Dictionary<string, string> _proxyAddresses = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Имена, которые не разрешились в текущей операции: каждая пара с таким сервером не должна ждать DNS заново.</summary>
+        readonly Dictionary<string, string> _proxyResolveFailures = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Последний список серверов подписки (в папке данных): по нему работают без сети и после перезапуска.</summary>
+        public SubscriptionCache Subscriptions { get; }
+        /// <summary>Создаёт обработчик HTTP для загрузки подписки. Подменяется в тестах, чтобы загрузка не ходила в сеть.</summary>
+        internal Func<HttpMessageHandler> SubscriptionHandler = Subscription.NewHandler;
+        /// <summary>Список серверов подписки старше этого срока обновляется при подключении (ошибка обновления не мешает работать со старым списком).</summary>
+        internal TimeSpan SubscriptionMaxAge = TimeSpan.FromHours(12);
 
         public Engine(string dataDir)
         {
@@ -86,7 +98,9 @@ namespace Zarp.Core
             Config = AppConfig.Load(cfg);
             Zapret = new Zapret(Path.Combine(dataDir, "zapret2"));
             SingBox = new SingBox(Path.Combine(dataDir, "singbox"));
-            Proxy = new ProxyRuntime(SingBox);
+            Xray = new Xray(Path.Combine(dataDir, "xray"));
+            Proxy = new ProxyRuntime(SingBox, Xray);
+            Subscriptions = new SubscriptionCache(Path.Combine(dataDir, "subscription.json"));
             Geo = new GeoData(Path.Combine(dataDir, "geodata"));
             CompileRules = config => Geo.Compile(config.Routing);
             InstallWarp = (progress, ct) => WarpInstaller.InstallAsync(DataDir, progress, ct);
@@ -101,11 +115,41 @@ namespace Zarp.Core
         /// <summary>Вместо WARP подключается собственный сервер.</summary>
         public bool ProxyMode => Config.UseProxy;
 
+        /// <summary>
+        /// Серверы вместо WARP: одна ссылка - один сервер; адрес подписки - серверы из её последнего сохранённого списка
+        /// (пока подписку не загружали, список пуст). Это эндпоинты: каждому подходят свои стратегии zapret2.
+        /// </summary>
+        List<Strategy> ProxyServers()
+        {
+            string source = (Config.ProxyUri ?? "").Trim();
+            var profiles = new List<ProxyProfile>();
+            if (Subscription.IsUrl(source))
+            {
+                var snapshot = Subscriptions.Load(source);
+                if (snapshot == null) return new List<Strategy>();
+                foreach (var link in snapshot.Links)
+                    if (ProxyProfile.TryParse(link, out var p) && profiles.All(x => x.Id != p.Id)) profiles.Add(p);
+            }
+            else if (ProxyProfile.TryParse(source, out var profile)) profiles.Add(profile);
+            return Subscription.ToStrategies(profiles);
+        }
+
+        /// <summary>
+        /// Стратегии со своим сервером: все пары «стратегия zapret2 + сервер», подходящие друг другу по транспорту. Это zapret2 плюс
+        /// конкретный эндпоинт, а не просто клиент VPN: поиск идёт по всем стратегиям и по всем серверам.
+        /// </summary>
+        List<Strategy> ProxyStrategies()
+        {
+            var servers = ProxyServers();
+            return servers.Count == 0 ? new List<Strategy>() : ServerPairs.Build((ZapretStrategies ?? (() => StrategyCatalog.Load(DataDir)))(), servers);
+        }
+
+        /// <summary>Стратегии zapret2, из которых составляются пары с сервером. Подменяется в тестах: так набор небольшой и известный.</summary>
+        internal Func<List<Strategy>> ZapretStrategies = null;
+
         public void ReloadStrategies()
         {
-            Strategies = ProxyMode
-                ? (ProxyProfile.TryParse(Config.ProxyUri, out var profile) ? new List<Strategy> { profile.ToStrategy() } : new List<Strategy>())
-                : StrategyCatalog.Load(DataDir);
+            Strategies = ProxyMode ? ProxyStrategies() : StrategyCatalog.Load(DataDir);
             if (Selected == null && Config.SelectedStrategyId != null)
             {
                 var matches = Strategies.Where(s => s.Custom && s.LegacyId == Config.SelectedStrategyId).ToList();
@@ -193,8 +237,8 @@ namespace Zarp.Core
                     return;
                 }
                 MarkFailed(s);
-                // сервер у нас один: повторный подбор означал бы те же проверки с тем же исходом
-                if (s.IsProxy) return;
+                // пара одна: повторный подбор означал бы те же проверки с тем же исходом; пар несколько - пробуем остальные
+                if (s.IsProxy && Candidates.Count <= 1) return;
                 var others = ConfirmedStrategies(s);
                 if (others.Count > 0)
                 {
@@ -259,7 +303,7 @@ namespace Zarp.Core
                 Set(EngineState.Preparing, M("detail.preparing"));
                 if (ProxyMode)
                 {
-                    // WARP и zapret2 не нужны: смотрим, не работает ли уже подключение через собственный сервер
+                    // WARP не нужен: смотрим, не работает ли уже подключение через собственный сервер (и winws2 при нём)
                     await ObserveConnectionAsync(_lifetime.Token);
                     return;
                 }
@@ -294,27 +338,70 @@ namespace Zarp.Core
             finally { _observation = null; observation.Dispose(); _busy.Release(); }
         }
 
-        /// <summary>Состояние подключения через собственный сервер: процесс sing-box жив и сервер отвечает.</summary>
+        /// <summary>
+        /// Какая из пар этого сервера сейчас работает, когда Zarp нашёл sing-box от прошлого запуска: выбранная в настройках; иначе та,
+        /// чьи аргументы у работающего winws2; иначе лучшая по сохранённым результатам.
+        /// </summary>
+        Strategy AdoptedPair(ProxyProfile server)
+        {
+            var pairs = Strategies.Where(x => x.IsProxy && x.Profile.Id == server.Id).ToList();
+            var chosen = pairs.FirstOrDefault(x => x.Id == Config.SelectedStrategyId);
+            if (chosen != null) return chosen;
+            string running = Zapret.RunningStrategyArgs();
+            if (running != null) chosen = pairs.FirstOrDefault(x => x.Args.Trim() == running);
+            return chosen ?? pairs.OrderBy(x => Config.Results.TryGetValue(x.Id, out var r) ? r.Score : int.MaxValue).FirstOrDefault();
+        }
+
+        /// <summary>Состояние подключения через собственный сервер: процессы sing-box и winws2 живы и сервер отвечает.</summary>
         async Task ObserveProxyAsync(CancellationToken ct)
         {
-            if (_proxy == null && ProxyProfile.TryParse(Config.ProxyUri, out var profile))
-                _proxy = Proxy.Adopt(profile); // sing-box мог остаться от прошлого запуска Zarp
+            if (_proxy == null)
+            {
+                // sing-box мог остаться от прошлого запуска Zarp; серверов может быть несколько (подписка), поэтому спрашиваем каждый, выбранный первым
+                var servers = Strategies.Where(x => x.IsProxy).OrderByDescending(x => x.Id == Config.SelectedStrategyId)
+                    .Select(x => x.Profile).GroupBy(p => p.Id).Select(g => g.First()).ToList();
+                foreach (var server in servers)
+                {
+                    _proxy = Proxy.Adopt(server);
+                    if (_proxy == null) continue;
+                    var pair = AdoptedPair(server);
+                    if (pair != null && Config.SelectedStrategyId != pair.Id) { Config.SelectedStrategyId = pair.Id; Config.Save(); }
+                    break;
+                }
+            }
             if (_proxy == null && Proxy.Running)
             {
                 // чужой для этого запуска sing-box (другой сервер, потерянные сведения): он держит адаптер и забирает трафик, а Zarp о нём не знает
                 Log.Write(L.T("log.singboxOrphan"));
                 Proxy.Stop();
             }
-            if (_proxy == null || !Proxy.Running)
+            if (_proxy == null || !Proxy.Intact)
             {
                 bool lost = _proxy != null && State == EngineState.Connected;
+                bool bridge = _proxy != null && Proxy.BridgeLost; // sing-box жив, а мост Xray пропал
                 _proxy = null;
-                if (lost) Log.Write(L.T("log.singboxStopped"));
+                if (lost) Log.Write(L.T(bridge ? "log.xrayStopped" : "log.singboxStopped"));
+                // от разрушенного подключения не должно оставаться половины: адаптер без моста забрал бы весь трафик и никуда его не отправил
+                if (Proxy.Running) Proxy.Stop();
+                // без туннеля winws2 незачем: он держал бы перехват соединения с сервером
+                if (_activeStrategy != null) Zapret.Stop();
+                _activeStrategy = null;
                 // фоновая проверка не должна стирать итог последней операции, как и в режиме WARP
                 if (State != EngineState.Idle)
                     Set(lost ? EngineState.Unknown : EngineState.Idle,
-                        lost ? M("detail.singboxFailed") : Selected == null ? M("detail.noStrategy") : M("detail.disconnected"));
+                        lost ? M(bridge ? "detail.xrayFailed" : "detail.singboxFailed") : Selected == null ? M("detail.noStrategy") : M("detail.disconnected"));
                 return;
+            }
+            // winws2 нужен, пока идут соединения с сервером: каждое новое проходит DPI только с ним
+            var pairInUse = _activeStrategy ?? Selected;
+            if (pairInUse != null && pairInUse.UsesZapret)
+            {
+                if (!Zapret.Running)
+                {
+                    Set(EngineState.Unknown, M("detail.winwsFailed"));
+                    return;
+                }
+                if (_activeStrategy == null) _activeStrategy = pairInUse;
             }
             var measure = await Proxy.MeasureAsync(_proxy, 1, ProxyTimeoutMs(), ct);
             ct.ThrowIfCancellationRequested();
@@ -422,9 +509,12 @@ namespace Zarp.Core
                 var s = _activeStrategy ?? Selected;
                 if (State == EngineState.Connected && s != null && s.UsesZapret && Zapret.Running)
                 {
-                    // Туннель WARP уже установлен, zapret нужен только для рукопожатия -
+                    // Туннель уже установлен, zapret нужен только новым соединениям с сервером или для рукопожатия WARP -
                     // поэтому winws2 можно перезапустить на новой версии, не разрывая подключение.
-                    var err = await Zapret.StartAsync(s, Config.RestrictToWarpIps, _lifetime.Token);
+                    Msg err;
+                    if (!s.IsProxy) err = await Zapret.StartAsync(s, Config.RestrictToWarpIps, _lifetime.Token);
+                    else if (!string.IsNullOrEmpty(_proxy?.Address)) err = await Zapret.StartAsync(s, ZapretTarget.For(_proxy.Address, s.Profile), _lifetime.Token);
+                    else err = null; // адрес сервера неизвестен (подключение найдено после перезапуска Zarp): обновление применится при следующем запуске winws2
                     if (err != null)
                     {
                         Log.Write(L.T("log.updateRestartFailed", err));
@@ -645,10 +735,15 @@ namespace Zarp.Core
             return false;
         }
 
-        /// <summary>Подготовка к работе через собственный сервер: ссылка, программы, sing-box, сторонние VPN.</summary>
+        /// <summary>Подготовка к работе через собственный сервер: ссылка или подписка, программы, zapret2, sing-box (и Xray для XHTTP), сторонние VPN.</summary>
         async Task<bool> PrepareProxyAsync(CancellationToken ct, bool searching)
         {
-            if (!ProxyProfile.TryParse(Config.ProxyUri, out _))
+            string source = (Config.ProxyUri ?? "").Trim();
+            if (Subscription.IsUrl(source))
+            {
+                if (!await EnsureSubscriptionAsync(source, ct)) return false;
+            }
+            else if (!ProxyProfile.TryParse(source, out _))
             {
                 Log.Write(L.T("log.proxyInvalid"));
                 Set(EngineState.Idle, M("detail.proxyInvalid"));
@@ -661,43 +756,59 @@ namespace Zarp.Core
                 Set(EngineState.Idle, M("apps.empty"));
                 return false;
             }
-            _proxyAddress = null;
+            _proxyAddresses.Clear();
+            _proxyResolveFailures.Clear();
             // сначала останавливаем свой туннель и WARP: проверки не должны идти ни через один из них
             await StopAllAsync();
             if (!await EnsureSingBoxAsync()) return false;
+            if (Strategies.Any(s => s.IsProxy && s.Profile.UsesXray) && !await EnsureXrayAsync()) return false;
+            // zapret2 нужен всегда: сервер без него подключался бы как обычным клиентом VPN, а Zarp нужен там, где сервер сам не проходит DPI
+            if (!Zapret.Installed || Zapret.EmbeddedIsNewer)
+            {
+                if (!await InstallZapretAsync(ct) && !Zapret.Installed) return false;
+            }
+            foreach (var other in Zapret.ForeignDpiTools())
+                Log.Write(L.T("log.otherDpi", other));
             return AskAboutForeignVpn(searching);
         }
 
         /// <summary>Положить sing-box на место (вшитый в exe). Антивирус может его заблокировать: тогда предлагаем исключение.</summary>
-        async Task<bool> EnsureSingBoxAsync()
+        Task<bool> EnsureSingBoxAsync() => EnsureProgramAsync(Proxy.Prepare, SingBox.Dir,
+            "err.singboxMissing", "detail.singboxMissing", "detail.avBlockedSingbox");
+
+        /// <summary>То же для моста Xray. Нужен только серверам с XHTTP, остальным его не распаковываем.</summary>
+        Task<bool> EnsureXrayAsync() => EnsureProgramAsync(Proxy.PrepareBridge, Xray.Dir,
+            "err.xrayMissing", "detail.xrayMissing", "detail.avBlockedXray");
+
+        async Task<bool> EnsureProgramAsync(Func<bool> prepare, string dir, string missingLog, string missingDetail, string blockedDetail)
         {
             for (int attempt = 0; attempt < 2; attempt++)
             {
                 try
                 {
-                    if (Proxy.Prepare()) return true;
-                    Log.Write(L.T("err.singboxMissing"));
-                    Set(EngineState.Idle, M("detail.singboxMissing"));
+                    if (prepare()) return true;
+                    Log.Write(L.T(missingLog));
+                    Set(EngineState.Idle, M(missingDetail));
                     return false;
                 }
                 catch (AntivirusBlockedException e) when (attempt == 0)
                 {
                     Log.Write(e.Message);
-                    bool allow = AskAntivirusExclusion?.Invoke(SingBox.Dir) ?? false;
-                    if (!allow || !await AddDefenderExclusionAsync(SingBox.Dir))
+                    bool allow = AskAntivirusExclusion?.Invoke(dir) ?? false;
+                    if (!allow || !await AddDefenderExclusionAsync(dir))
                     {
-                        Set(EngineState.Idle, M("detail.avBlockedSingbox"));
+                        Set(EngineState.Idle, M(blockedDetail));
                         return false;
                     }
                 }
                 catch (Exception e)
                 {
                     Log.Write(L.T("log.error", e.Message));
-                    Set(EngineState.Idle, M("detail.singboxMissing"));
+                    Set(EngineState.Idle, M(missingDetail));
                     return false;
                 }
             }
-            Set(EngineState.Idle, M("detail.avBlockedSingbox"));
+            Set(EngineState.Idle, M(blockedDetail));
             return false;
         }
 
@@ -1006,6 +1117,70 @@ namespace Zarp.Core
 
         int ProxyTimeoutMs() => Math.Max(6, Math.Min(60, Config.TestTimeoutSec)) * 1000;
 
+        // ------------------------------------------------------------------ подписка
+
+        /// <summary>
+        /// Загрузить подписку и сохранить список её серверов в папке данных. Настройки не меняются: адрес сохраняет ApplyConnection.
+        /// Ошибка загрузки - SubscriptionException (причина без адреса и токена); если подходящих серверов нет, старый список остаётся.
+        /// </summary>
+        public async Task<SubscriptionResult> LoadSubscriptionAsync(string url, CancellationToken ct = default)
+        {
+            url = (url ?? "").Trim();
+            if (!Subscription.IsUrl(url)) throw new SubscriptionException("redirect");
+            var result = await Subscription.LoadAsync(url, SubscriptionHandler, ct).ConfigureAwait(false);
+            if (result.Servers.Count > 0)
+            {
+                Subscriptions.Save(url, result.Servers.Select(s => s.Link), DateTime.UtcNow);
+                Log.Write(L.T("log.subscriptionLoaded", result.Servers.Count, result.Unsupported, result.Refused));
+            }
+            return result;
+        }
+
+        /// <summary>Сколько серверов в сохранённом списке подписки и когда он обновлялся (для окна). null - списка нет.</summary>
+        public SubscriptionCache.Snapshot SubscriptionSnapshot(string url) => Subscription.IsUrl(url) ? Subscriptions.Load(url.Trim()) : null;
+
+        /// <summary>
+        /// Перед работой с подпиской: список есть и не старше срока, иначе пробуем обновить. Если обновить не удалось, а старый список
+        /// есть, работаем со старым (панель может быть недоступна без VPN). false - серверов нет совсем.
+        /// </summary>
+        async Task<bool> EnsureSubscriptionAsync(string url, CancellationToken ct)
+        {
+            var snapshot = Subscriptions.Load(url);
+            if (snapshot == null || DateTime.UtcNow - snapshot.Updated > SubscriptionMaxAge)
+            {
+                try
+                {
+                    var result = await LoadSubscriptionAsync(url, ct);
+                    ct.ThrowIfCancellationRequested();
+                    if (result.Servers.Count == 0 && snapshot == null)
+                    {
+                        Log.Write(L.T("log.subscriptionEmpty", result.Unsupported, result.Refused));
+                        Set(EngineState.Idle, M("detail.subscriptionEmpty"));
+                        return false;
+                    }
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (SubscriptionException e)
+                {
+                    // адреса и токена в причине нет (см. SubscriptionException)
+                    Log.Write(L.T(snapshot == null ? "log.subscriptionFailed" : "log.subscriptionFailedOld", e.Describe()));
+                    if (snapshot == null)
+                    {
+                        Set(EngineState.Idle, M("detail.subscriptionFailed"));
+                        return false;
+                    }
+                }
+                ReloadStrategies();
+            }
+            if (Candidates.Count == 0)
+            {
+                Log.Write(L.T("log.subscriptionEmpty", 0, 0));
+                Set(EngineState.Idle, M("detail.subscriptionEmpty"));
+                return false;
+            }
+            return true;
+        }
+
         /// <summary>Подробность неудачи (текст сетевой ошибки и последняя ошибка sing-box) - в журнал, а не в список результатов.</summary>
         void LogProxyDetail(ProxyMeasure measure)
         {
@@ -1020,9 +1195,15 @@ namespace Zarp.Core
         /// </summary>
         async Task<ProxySession> NewProxySessionAsync(ProxyProfile profile, bool tun, CancellationToken ct)
         {
-            if (_proxyAddress == null) _proxyAddress = await Proxy.ResolveAsync(profile.Host, ct);
+            if (!_proxyAddresses.TryGetValue(profile.Host, out var address))
+            {
+                // имя, которое не разрешилось, не разрешается заново для каждой пары с этим сервером: у каждой был бы свой срок ожидания DNS
+                if (_proxyResolveFailures.TryGetValue(profile.Host, out var failure)) throw new IOException(failure);
+                try { _proxyAddresses[profile.Host] = address = await Proxy.ResolveAsync(profile.Host, ct); }
+                catch (IOException e) { _proxyResolveFailures[profile.Host] = e.Message; throw; }
+            }
             var session = Proxy.NewSession(profile);
-            session.Address = _proxyAddress;
+            session.Address = address;
             session.Tun = tun;
             session.Ipv6 = Config.ProxyIpv6;
             session.Dns = Config.ProxyDns;
@@ -1038,18 +1219,29 @@ namespace Zarp.Core
             return session;
         }
 
-        /// <summary>Проверить собственный сервер: поднять sing-box без адаптера и сделать запросы через проверочный вход.</summary>
+        /// <summary>Включить winws2 для пары: он перехватывает соединение с тем адресом и портом, на которые идёт сессия. null - получилось.</summary>
+        Task<Msg> StartZapretAsync(Strategy s, ProxySession session, CancellationToken ct) =>
+            Zapret.StartAsync(s, ZapretTarget.For(session.Address, s.Profile), ct);
+
+        /// <summary>
+        /// Проверить пару «стратегия + сервер»: включить winws2 со стратегией, поднять sing-box без адаптера и сделать запросы через
+        /// проверочный вход. Соединение с сервером идёт через перехват winws2, как и при настоящем подключении.
+        /// </summary>
         async Task<TestResult> TestProxyAsync(Strategy s, CancellationToken ct)
         {
             var res = new TestResult { StrategyId = s.Id, When = DateTime.Now, Endpoint = s.Profile.Endpoint };
             ProxySession session;
             try { session = await NewProxySessionAsync(s.Profile, tun: false, ct); }
             catch (IOException e) { res.Fail(M("err.proxyFailed", e.Message)); return res; }
-            var err = await Proxy.StartAsync(session, ct);
+            var err = await StartZapretAsync(s, session, ct);
+            if (err != null) { res.Fail(err); return res; }
+            err = await Proxy.StartAsync(session, ct);
             if (err != null) { res.Fail(err); return res; }
             try
             {
-                var m = await Proxy.MeasureAsync(session, 3, ProxyTimeoutMs(), ct);
+                // сначала один запрос: у пары, которая не проходит, не нужно ждать срок ещё раз на каждый из остальных
+                var first = await Proxy.ProbeAsync(session, ProxyTimeoutMs(), ct);
+                var m = first.Ok ? await Proxy.MeasureAsync(session, 3, ProxyTimeoutMs(), ct) : first;
                 if (!m.Ok)
                 {
                     res.Fail(M("err.proxyNoTraffic"));
@@ -1057,7 +1249,7 @@ namespace Zarp.Core
                     return res;
                 }
                 res.Ok = true;
-                res.ConnectMs = m.FirstMs;
+                res.ConnectMs = first.FirstMs;
                 res.PingMs = m.PingMs;
                 return res;
             }
@@ -1065,8 +1257,9 @@ namespace Zarp.Core
         }
 
         /// <summary>
-        /// Подключиться через собственный сервер. Сначала сервер проверяется без адаптера: неработающий сервер не должен
-        /// забрать весь трафик, а потом sing-box поднимается заново уже с виртуальным адаптером Zarp.
+        /// Подключиться через собственный сервер со стратегией пары. Сначала включается winws2, потом сервер проверяется без адаптера:
+        /// неработающий сервер не должен забрать весь трафик, а после этого sing-box поднимается заново уже с виртуальным адаптером Zarp.
+        /// winws2 остаётся включённым, пока работает туннель: каждое новое соединение с сервером проходит DPI только с ним.
         /// </summary>
         async Task<bool> ApplyProxyAsync(Strategy s, CancellationToken ct)
         {
@@ -1075,6 +1268,8 @@ namespace Zarp.Core
             {
                 Log.Write(why.ToString());
                 Proxy.Stop();
+                Zapret.Stop();
+                _activeStrategy = null;
                 _proxy = null;
                 Set(EngineState.Idle, M("detail.connectFailed"));
                 return false;
@@ -1083,7 +1278,14 @@ namespace Zarp.Core
             ProxySession probe;
             try { probe = await NewProxySessionAsync(s.Profile, tun: false, ct); }
             catch (IOException e) { return Fail(M("err.proxyFailed", e.Message)); }
-            var err = await Proxy.StartAsync(probe, ct);
+            var err = await StartZapretAsync(s, probe, ct);
+            if (err != null)
+            {
+                Log.Write(err.ToString());
+                Set(EngineState.Idle, M("detail.winwsFailed"));
+                return false;
+            }
+            err = await Proxy.StartAsync(probe, ct);
             if (err != null) return Fail(err);
             var check = await Proxy.MeasureAsync(probe, 1, ProxyTimeoutMs() * 2, ct);
             if (!check.Ok) LogProxyDetail(check);
@@ -1100,6 +1302,7 @@ namespace Zarp.Core
             if (!done.Ok) return Fail(M("err.proxyNoTraffic"));
             ct.ThrowIfCancellationRequested();
             _proxy = session;
+            _activeStrategy = s;
             Log.Write(L.T("log.proxyConnected", check.FirstMs, done.PingMs, s.Profile.Endpoint));
             Set(EngineState.Connected, M("detail.strategy", s));
             return true;

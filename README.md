@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/feg55/Zarp)](https://github.com/feg55/Zarp/releases/latest)
 [![License: MIT](https://img.shields.io/github/license/feg55/Zarp)](LICENSE)
 
-One-click Cloudflare WARP for networks that block it. Zarp finds a [zapret2](https://github.com/bol-van/zapret2) strategy that gets the WARP handshake through DPI, remembers it and connects. The Windows version can also connect through your own VLESS, Trojan or Hysteria2 server, with routing rules and a choice of programs. Available for Windows, macOS and Android.
+One-click Cloudflare WARP for networks that block it. Zarp finds a [zapret2](https://github.com/bol-van/zapret2) strategy that gets the WARP handshake through DPI, remembers it and connects. The Windows version can also put zapret2 in front of your own VLESS, Trojan, Hysteria2 or XHTTP server: it finds the strategy that gets the connection to that server through DPI and then tunnels through the server, with routing rules and a choice of programs. Available for Windows, macOS and Android.
 
 ![Zarp](docs/screenshot.png)
 
@@ -27,10 +27,10 @@ One-click Cloudflare WARP for networks that block it. Zarp finds a [zapret2](htt
 - **Repeated checks.** Every candidate must pass twice, the second time on a different WARP endpoint when test isolation is on. A quick scan counts only confirmed strategies, and a connection counts only if traffic really goes through WARP.
 - **Self-healing.** If the saved strategy stops working, Zarp tries the other verified ones before searching again.
 - **Countries.** Filter the strategies by Russia, Iran and China, one or several at once, and tag your own strategies with countries. The filter covers the list, scans, auto-connect, rechecks and saved results.
-- **Your own endpoints and server.** Pin WARP to the endpoints you list, or replace WARP with your own VLESS, Trojan or Hysteria2 link (TCP, WebSocket, gRPC, HTTPUpgrade, TLS, Reality, Vision, Salamander). The connection goes through the embedded [sing-box](https://github.com/SagerNet/sing-box) and carries TCP and UDP.
+- **Your own endpoints and server.** Pin WARP to the endpoints you list, or replace WARP with your own VLESS, Trojan or Hysteria2 link, or with a subscription (the `https://` address of a list of such links) (TCP, WebSocket, gRPC, HTTPUpgrade, XHTTP, TLS with ECH, Reality, Vision, Salamander). It is still zapret2 plus an endpoint, not a plain VPN client: Zarp tests every zapret2 strategy against every server and connects with the best pair, and winws2 keeps intercepting the connection to that server while the tunnel is up. The tunnel is the embedded [sing-box](https://github.com/SagerNet/sing-box) and carries TCP and UDP. VLESS over XHTTP, which sing-box cannot speak, is handled by the embedded [Xray-core](https://github.com/XTLS/Xray-core) as a local bridge behind sing-box.
 - **Routing and per-program proxy** (your own server). Presets for local networks, Russia, Iran and China, editable Direct, Proxy and Block rules (GeoIP, GeoSite, domains, IP ranges, regular expressions), downloadable V2Ray/Xray `.dat` databases, and a choice of the programs that use the server. See [connection settings](docs/connection-settings.md).
-- **Zero setup.** A single `Zarp.exe` with zapret2 and sing-box embedded; zapret2 updates itself in the background. If Cloudflare WARP is missing, Zarp downloads the official client from Cloudflare and installs it after you agree.
-- **Low overhead.** Only WARP addresses and handshake packets are intercepted. The tunnel itself never passes through zapret.
+- **Zero setup.** A single `Zarp.exe` with zapret2, sing-box and Xray-core embedded; zapret2 updates itself in the background. If Cloudflare WARP is missing, Zarp downloads the official client from Cloudflare and installs it after you agree.
+- **Low overhead.** Only the connection to WARP (or, with your own server, to that one server) is intercepted, and only its handshake packets are changed. The traffic of the tunnel is not touched.
 - **Your language.** English, Русский, Español, Português, 中文, हिन्दी, Français and Deutsch. Zarp follows the Windows language (English if it is not on the list), and the globe button switches it on the fly.
 
 ## Android
@@ -57,9 +57,9 @@ Download the APK from [Releases](https://github.com/feg55/Zarp-Android/releases/
 
 **No Cloudflare WARP yet?** On the first press Zarp asks whether to install it. If you agree, it downloads the official installer from Cloudflare (about 60 MB), checks that it is signed by Cloudflare, installs it silently and carries on with the search. The WARP client is proprietary software that Cloudflare licenses to you, so Zarp does not bundle it: it fetches it from Cloudflare exactly as you would in a browser, and by installing it you accept the [Cloudflare WARP terms](https://www.cloudflare.com/application/terms/). If the Cloudflare download site is blocked for you, get `Cloudflare_WARP.msi` any other way (or install WARP yourself with `winget install Cloudflare.Warp`) and put the file into `%LOCALAPPDATA%\Zarp`; Zarp verifies its signature the same way and installs it.
 
-Settings offer two searches. **Quick scan** (also used by the power button) stops after 3 working strategies; the number is adjustable. **Full scan** tests every strategy: slower, but nothing is skipped, so it finds the fastest one for sure.
+Settings offer two searches. **Quick scan** (also used by the power button) stops after 3 working strategies; the number is adjustable. **Full scan** tests every strategy: slower, but nothing is skipped, so it finds the fastest one for sure. With your own server a strategy is a pair of a zapret2 strategy and a server: the scans go through all pairs (each strategy against every server of a subscription that it suits), and the number of pairs can be large, so a full scan can take a long time.
 
-**Server and endpoints**, **Routing** and **Per-app proxy** in Settings are described in [connection settings](docs/connection-settings.md). The short version: the official WARP client has no per-app mode and cannot route by country or domain, so routing and per-app proxy work with **your own server** (paste one link in **Server and endpoints** and switch it on), while the country filter and custom endpoints belong to WARP. The country filter and the routing presets are independent.
+**Server and endpoints**, **Routing** and **Per-app proxy** in Settings are described in [connection settings](docs/connection-settings.md). The short version: the official WARP client has no per-app mode and cannot route by country or domain, so routing and per-app proxy work with **your own server** (paste one link or a subscription in **Server and endpoints** and switch it on), while custom endpoints belong to WARP. The country filter works in both modes: with your own server it chooses the zapret2 strategies that are tried against the server. The country filter and the routing presets are independent.
 
 Closing the window asks whether to hide Zarp in the tray or quit. Select **Remember my choice** to make that action the default. Settings → **On close** lets you choose **Ask every time**, **Hide to tray** or **Exit the app**. **Exit** in the tray menu always quits.
 
@@ -67,10 +67,10 @@ Closing the window asks whether to hide Zarp in the tray or quit. Select **Remem
 > **"Windows protected your PC"?** Older releases and local builds may be unsigned. Release signing requires maintainer setup; see [code signing](docs/code-signing.md). A trusted signature identifies the publisher, but new releases can still trigger SmartScreen while reputation builds. [Verify the download](#verify-the-download) before running it.
 
 > [!NOTE]
-> Turn off any other VPN (Happ, v2rayN, Clash, AmneziaVPN, ...) before searching. WARP traffic would go through its tunnel, so every test would measure that VPN instead of your network and no strategy would be found. Zarp warns you, asks before searching anyway, and never overwrites saved results with failures from such a run. Connecting with a strategy you already saved works either way.
+> Turn off any other VPN (Happ, v2rayN, Clash, AmneziaVPN, ...) before searching. The traffic of WARP (or of your own server) would go through its tunnel, so every test would measure that VPN instead of your network and no strategy would be found. Zarp warns you, asks before searching anyway, and never overwrites saved results with failures from such a run. Connecting with a strategy you already saved works either way.
 
 > [!WARNING]
-> Windows Defender may flag WinDivert as a hacktool. This is a known false positive. Zarp offers to add its zapret2 folder to Defender exclusions when that happens. The same offer is made for the sing-box folder if you use your own server and the antivirus blocks `sing-box.exe`.
+> Windows Defender may flag WinDivert as a hacktool. This is a known false positive. Zarp offers to add its zapret2 folder to Defender exclusions when that happens. The same offer is made for the sing-box folder if you use your own server and the antivirus blocks `sing-box.exe`, and for the Xray folder if the link uses XHTTP and the antivirus blocks `xray.exe`.
 
 Command line: `--connect` connects on start, `--autostart` starts minimized to tray (used by the autostart task).
 
@@ -86,18 +86,19 @@ gh attestation verify .\Zarp.exe --repo feg55/Zarp     # proves the file was bui
 ### What Zarp changes on your system
 
 - If Cloudflare WARP is not installed and you agree, installs it from the official Cloudflare installer (Windows Installer, `msiexec /i ... /qn`). Nothing is installed without your consent. The installer is deleted afterwards.
-- Runs as administrator. While a strategy is active, `winws2` from zapret2 loads the WinDivert driver and modifies only WARP handshake packets.
+- Runs as administrator. While a strategy is active, `winws2` from zapret2 loads the WinDivert driver and modifies only the handshake packets of the WARP connection (with your own server: of the connection to that server, which is its address and port, nothing else).
 - Changes the tunnel protocol and MASQUE options of your WARP client through `warp-cli` to match the chosen strategy. During a search it also pins a WARP endpoint for each test and resets it to automatic afterwards (when you list your own endpoints, the connection stays pinned to the one that passed the check).
 - Only if you use your own server: extracts sing-box (about 45 MB) to `%LOCALAPPDATA%\Zarp\singbox` and, while connected, creates a network adapter named `Zarp` that carries the system's traffic, with routes and firewall rules that keep DNS from bypassing it. They disappear when you disconnect, or when you exit with **Disconnect on exit** on (the default). The first time, Windows also installs the Wintun network driver that sing-box carries inside itself; the driver stays installed afterwards. If the antivirus blocks `sing-box.exe`, Zarp offers a Defender exclusion for that folder, as it does for zapret2.
+- Only if the link of your own server uses XHTTP: also extracts Xray-core (about 36 MB) to `%LOCALAPPDATA%\Zarp\xray` and runs `xray.exe` as a local SOCKS5 bridge on `127.0.0.1` (a random port with a random password) that sing-box sends the traffic to. To keep the connection of Xray to your server from looping back into the `Zarp` adapter, sing-box sends everything from `xray.exe` straight out and the address of your server is left out of the adapter's routes. Xray adds no adapter, driver or firewall rule of its own and stops together with sing-box.
 - Extracts zapret2 and keeps its settings and log in `%LOCALAPPDATA%\Zarp`.
-- Only if you turn them on: a Task Scheduler task named `Zarp` for **Start with Windows**, and a Windows Defender exclusion for the zapret2 folder, or for the sing-box folder if you use your own server (Zarp asks first).
+- Only if you turn them on: a Task Scheduler task named `Zarp` for **Start with Windows**, and a Windows Defender exclusion for the zapret2 folder, or for the sing-box folder (and the Xray folder for XHTTP links) if you use your own server (Zarp asks first).
 
 ### Uninstall
 
 1. In Settings, turn off **Start with Windows** (or run `schtasks /Delete /TN Zarp /F`).
 2. Choose **Exit** in the tray menu, then delete `Zarp.exe` and the `%LOCALAPPDATA%\Zarp` folder.
 3. Restore the WARP defaults: `warp-cli tunnel protocol reset`, `warp-cli tunnel masque-options reset`, `warp-cli tunnel endpoint reset`.
-4. If you added the Defender exclusion, remove it in an administrator PowerShell: `Remove-MpPreference -ExclusionPath "$env:LOCALAPPDATA\Zarp\zapret2"` (and the same for `...\Zarp\singbox` if you used your own server).
+4. If you added the Defender exclusion, remove it in an administrator PowerShell: `Remove-MpPreference -ExclusionPath "$env:LOCALAPPDATA\Zarp\zapret2"` (and the same for `...\Zarp\singbox` and `...\Zarp\xray` if you used your own server).
 5. If you used your own server and want the Wintun network driver gone too, find its package with `pnputil /enum-drivers` (original name `wintun.inf`) and remove it with `pnputil /delete-driver <oemNN.inf> /uninstall`. Other VPN programs may use the same driver.
 6. If Zarp installed Cloudflare WARP for you and you no longer need it, remove it like any program: Settings → Apps → **Cloudflare One Client** (called **Cloudflare WARP** in older versions), or `winget uninstall Cloudflare.Warp`.
 
@@ -107,6 +108,7 @@ Zarp does not collect, store or send any personal data, and it has no telemetry.
 
 - `https://www.cloudflare.com/cdn-cgi/trace`, while testing or connecting, and every 15 seconds while WARP is connected, to check that traffic goes through WARP and to measure latency. With your own server the same page is requested through the server.
 - Only if you use your own server: the connection to that server. Its link, with the password, is kept in `zarp.json` in your data folder and never written to the log.
+- Only if you use a subscription: one `https://` request to the address you set, when you save it, press Save again to refresh it, or connect with a list that is older than 12 hours. The token in that address is kept in `zarp.json` and never written to the log; the list of servers it returns is kept in `subscription.json`.
 - Only if you press Download in **GeoIP and GeoSite**: the address you set there. By default these are `https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat` and `.../geosite.dat`.
 - `https://downloads.cloudflareclient.com/`, only if Cloudflare WARP is missing and you agreed to install it, to download the official installer.
 - `https://github.com/bol-van/zapret2/releases` (the GitHub API as a fallback), to check for and download zapret2 updates. Turn off **Update zapret2 automatically** in Settings to disable this.
@@ -117,11 +119,11 @@ WARP itself is a Cloudflare service covered by the [Cloudflare WARP privacy poli
 
 A strategy is a WARP tunnel protocol plus a winws2 profile. During the search Zarp starts winws2 for each strategy, connects WARP via `warp-cli`, waits for `Connected` and checks `cdn-cgi/trace` for `warp=on`. Score is `connect time + 4 × ping`. The fakes are real packets from services that are not blocked (QUIC/TLS for google, vk and gosuslugi), because DPI ignores empty fakes.
 
-With your own server there is no strategy to find: Zarp checks the server twice with a real HTTPS request, then starts sing-box with a network adapter that carries the system's traffic, applying your routing rules and program selection. Details are in [connection settings](docs/connection-settings.md).
+With your own server a strategy is a pair of a zapret2 strategy and a server. TLS over TCP (VLESS, Trojan, XHTTP) is tried with the TLS strategies, QUIC (Hysteria2) with the QUIC ones. For each pair Zarp starts winws2 so that it intercepts only the connection to the address and port of that server, then checks the server twice with a real HTTPS request through sing-box. The best pair wins; sing-box then starts with a network adapter that carries the system's traffic, applying your routing rules and program selection, and winws2 keeps running next to it. Details are in [connection settings](docs/connection-settings.md).
 
 The built-in strategies and where their syntax comes from are described in [docs/strategies.md](docs/strategies.md).
 
-App data lives in `%LOCALAPPDATA%\Zarp`: settings, log, extracted zapret2 and sing-box (`singbox`), downloaded GeoIP and GeoSite databases (`geodata`) and `strategies.txt` for your own strategies:
+App data lives in `%LOCALAPPDATA%\Zarp`: settings, log, extracted zapret2, sing-box (`singbox`) and Xray (`xray`), the saved list of servers of your subscription (`subscription.json`, it holds the server links), downloaded GeoIP and GeoSite databases (`geodata`) and `strategies.txt` for your own strategies:
 
 ```
 # name | transport (h3, h2, wg) | winws2 profile args | countries (optional)
@@ -137,7 +139,7 @@ See the [zapret2 manual](https://github.com/bol-van/zapret2/blob/master/docs/man
 .\build.ps1 -Version 1.0.0   # dist\Zarp.exe
 ```
 
-Requires the .NET SDK 6 or later (the target is .NET Framework 4.8). `tools/fetch-zapret.ps1` packs the latest zapret2 release into `vendor/zapret2.zip`, and `tools/fetch-singbox.ps1` packs the pinned sing-box release (its SHA-256 is checked) into `vendor/singbox.zip`; both get embedded into the exe, which makes it about 18 MB. Without `vendor/singbox.zip` the build works but your own server mode reports that sing-box is missing.
+Requires the .NET SDK 6 or later (the target is .NET Framework 4.8). `tools/fetch-zapret.ps1` packs the latest zapret2 release into `vendor/zapret2.zip`, `tools/fetch-singbox.ps1` packs the pinned sing-box release (its SHA-256 is checked) into `vendor/singbox.zip`, and `tools/fetch-xray.ps1` does the same for the pinned Xray-core release (`vendor/xray.zip`); all three get embedded into the exe, which makes it about 32 MB. Without `vendor/singbox.zip` the build works but your own server mode reports that sing-box is missing; without `vendor/xray.zip` only the XHTTP links report that Xray is missing.
 
 GitHub Actions builds every push. A `v*` tag publishes `Zarp.exe`; releases are unsigned until [SignPath is configured](docs/code-signing.md) and the repository variable `SIGNPATH_ENABLED` is set to `true`. Once signing is enabled, a missing configuration or invalid signature stops the release. Release notes report the signing status.
 
@@ -168,6 +170,6 @@ Only `Zarp.exe` built by GitHub Actions from this repository is signed, and ever
 
 Zarp for Windows is released under the [MIT License](LICENSE). [Zarp for Android](https://github.com/feg55/Zarp-Android) is a separate project under GPL-3.0.
 
-`Zarp.exe` bundles [zapret2](https://github.com/bol-van/zapret2) (MIT) with LuaJIT (MIT) and zlib, [WinDivert](https://reqrypt.org/windivert.html) (LGPL-3.0), the Cygwin DLL (LGPL-3.0-or-later) and [sing-box](https://github.com/SagerNet/sing-box) (GPL-3.0-or-later, started as a separate program, with the [Wintun](https://www.wintun.net/) driver inside it under the Wintun Prebuilt Binaries License), plus country IP ranges from [ipverse/country-ip-blocks](https://github.com/ipverse/country-ip-blocks) (CC0). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for versions, license texts and source links.
+`Zarp.exe` bundles [zapret2](https://github.com/bol-van/zapret2) (MIT) with LuaJIT (MIT) and zlib, [WinDivert](https://reqrypt.org/windivert.html) (LGPL-3.0), the Cygwin DLL (LGPL-3.0-or-later) and [sing-box](https://github.com/SagerNet/sing-box) (GPL-3.0-or-later, started as a separate program, with the [Wintun](https://www.wintun.net/) driver inside it under the Wintun Prebuilt Binaries License), [Xray-core](https://github.com/XTLS/Xray-core) (MPL-2.0, unmodified, started as a separate program), plus country IP ranges from [ipverse/country-ip-blocks](https://github.com/ipverse/country-ip-blocks) (CC0). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for versions, license texts and source links.
 
 Cloudflare and WARP are trademarks of Cloudflare, Inc. Zarp is an independent project, not affiliated with or endorsed by Cloudflare. Zarp does not bundle or redistribute any Cloudflare software: it only drives the WARP client through `warp-cli`, and when the client is missing it fetches the official installer from Cloudflare on your request.

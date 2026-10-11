@@ -52,6 +52,21 @@ static partial class Program
             Check(serverPanel.Visible && !warpPanel.Visible && !save.Enabled, "A server needs a link first");
             link.Text = "vless://nope";
             Check(!save.Enabled && linkStatus.Text == L.T("proxy.invalid"), "A bad link is explained and cannot be saved: " + linkStatus.Text);
+            // ссылка из другой программы с XHTTP: принимается, как любая другая (подключение идёт через мост Xray)
+            link.Text = "vless://" + TestUuid + "@docs.example:8433?encryption=none&extra=%7B%22mode%22%3A%22auto%22%2C%22seqKey%22%3A%22X-Seq%22%7D&mode=auto&path=%2F&security=tls&type=xhttp";
+            Check(save.Enabled && linkStatus.Text == "VLESS: docs.example:8433", "An XHTTP link can be saved: " + linkStatus.Text);
+            link.Text = "vless://" + TestUuid + "@docs.example:8433?security=tls&type=xhttp&extra=nope";
+            Check(!save.Enabled && linkStatus.Text == L.T("proxy.extra"), "An extra parameter that is not JSON is explained: " + linkStatus.Text);
+            link.Text = "vless://" + TestUuid + "@docs.example:8433?security=tls&type=xhttp&allowInsecure=1";
+            Check(!save.Enabled && linkStatus.Text == L.T("proxy.insecure"), "XHTTP without the certificate check is explained: " + linkStatus.Text);
+            link.Text = "vmess://abc";
+            Check(!save.Enabled && linkStatus.Text == L.T("proxy.scheme"), "Another kind of link says which links are accepted: " + linkStatus.Text);
+            link.Text = "trojan://secret@proxy.example:443?type=kcp";
+            Check(!save.Enabled && linkStatus.Text == L.T("proxy.transport", "kcp") && !linkStatus.Text.Contains("secret"), "An unsupported transport is named: " + linkStatus.Text);
+            link.Text = "trojan://secret@proxy.example:443?headerType=http";
+            Check(!save.Enabled && linkStatus.Text == L.T("proxy.param", "headerType") && !linkStatus.Text.Contains("secret"), "An unsupported parameter is named: " + linkStatus.Text);
+            Check(linkStatus.Text.Length > 0 && TextRenderer.MeasureText(linkStatus.Text, linkStatus.Font, new System.Drawing.Size(linkStatus.Width, int.MaxValue), TextFormatFlags.WordBreak).Height <= linkStatus.Height,
+                "The explanation fits the space under the link");
             link.Text = "trojan://secret@proxy.example:443";
             Check(save.Enabled && linkStatus.Text == "Trojan: proxy.example:443" && !linkStatus.Text.Contains("secret"), "A good link shows the protocol and address, never the password");
             dns.Text = "not-an-ip";
@@ -63,7 +78,7 @@ static partial class Program
             save.PerformClick();
             var c = engine.Config;
             Check(c.UseProxy && c.ProxyUri == "trojan://secret@proxy.example:443" && !c.ProxyIpv6 && c.ProxyDns == "9.9.9.9, 1.1.1.1" && c.Results.Count == 0 &&
-                  engine.Strategies.Count == 1 && engine.Strategies[0].IsProxy, "Saving switches the engine to the server");
+                  engine.Strategies.Count > 0 && engine.Strategies.All(s => s.IsProxy && s.UsesZapret && s.Profile.Host == "proxy.example"), "Saving switches the engine to the server");
             var saved = AppConfig.Load(Path.Combine(engine.DataDir, "zarp.json"));
             Check(saved.UseProxy && saved.ProxyUri == c.ProxyUri && !saved.ProxyIpv6, "The server settings are stored");
 

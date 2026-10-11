@@ -363,7 +363,9 @@ namespace Zarp.UI
 
         bool AskExclusion(string dir)
         {
-            Func<bool> ask = () => MessageBox.Show(this, L.T("dlg.antivirus", dir),
+            // у sing-box и Xray другая причина (прокси-программы часто принимают за вредоносные), и WinDivert тут ни при чём
+            bool proxyProgram = ProcessUtil.SamePath(dir, _engine.SingBox.Dir) || ProcessUtil.SamePath(dir, _engine.Xray.Dir);
+            Func<bool> ask = () => MessageBox.Show(this, L.T(proxyProgram ? "dlg.antivirusProxy" : "dlg.antivirus", dir),
                 "Zarp", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
             return InvokeRequired ? (bool)Invoke(ask) : ask();
         }

@@ -2,10 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -19,6 +22,39 @@ namespace Zarp.Core
     public sealed class AntivirusBlockedException : Exception
     {
         public AntivirusBlockedException(string msg, Exception inner) : base(msg, inner) { }
+    }
+
+    /// <summary>
+    /// Что перехватывает winws2 в режиме «свой сервер»: соединение с одним сервером. Address - уже разрешённый IP-адрес, на который
+    /// реально идёт соединение (имя сервера разрешается заранее), Port - порт сервера, Quic - соединение по UDP/QUIC, а не TLS по TCP.
+    /// </summary>
+    public sealed class ZapretTarget
+    {
+        public string Address;
+        public int Port;
+        public bool Quic;
+
+        /// <summary>
+        /// Адрес для фильтра WinDivert. Всё, что не IP-адрес, в фильтр попасть не должно; сокращённые записи вроде «203.0.113»,
+        /// которые .NET принимает, тоже не годятся: адрес пишется полностью.
+        /// </summary>
+        public IPAddress Ip
+        {
+            get
+            {
+                if (Address == null || !IPAddress.TryParse(Address, out var ip) ||
+                    (ip.AddressFamily == AddressFamily.InterNetwork && Address.Split('.').Length != 4))
+                    throw new ArgumentException("The address of the server must be an IP address");
+                if (ip.IsIPv4MappedToIPv6) ip = ip.MapToIPv4();
+                return ip.AddressFamily == AddressFamily.InterNetworkV6 ? new IPAddress(ip.GetAddressBytes()) : ip; // без идентификатора области
+            }
+        }
+
+        /// <summary>Цель для сервера: порт и транспорт берутся из ссылки, адрес - тот, который выбрала программа.</summary>
+        public static ZapretTarget For(string address, ProxyProfile server) => new ZapretTarget
+        {
+            Address = address, Port = server.Port, Quic = server.OuterTransport == WarpTransport.MasqueH3,
+        };
     }
 
     /// <summary>Установка, настройка и запуск winws2 из zapret2.</summary>
@@ -60,9 +96,10 @@ namespace Zarp.Core
             new[] { "2606:4700:d0::", "2606:4700:df:ffff:ffff:ffff:ffff:ffff" },
         };
 
-        // Первый пакет QUIC v1 (Initial, long header) - сюда входит MASQUE по HTTP/3.
-        const string QuicInitialFilter =
-            "outbound and udp and udp.PayloadLength>=256 and udp.Payload[0]>=0xC0 and udp.Payload[0]<0xD0 and udp.Payload[1]==0 and udp.Payload16[1]==0 and udp.Payload[4]==1";
+        // Первый пакет QUIC v1 (Initial, long header) - сюда входит MASQUE по HTTP/3 и Hysteria2.
+        const string QuicInitialPayload =
+            "udp.PayloadLength>=256 and udp.Payload[0]>=0xC0 and udp.Payload[0]<0xD0 and udp.Payload[1]==0 and udp.Payload16[1]==0 and udp.Payload[4]==1";
+        const string QuicInitialFilter = "outbound and udp and " + QuicInitialPayload;
         // WireGuard handshake initiation.
         const string WireGuardInitFilter =
             "outbound and udp and udp.PayloadLength==148 and udp.Payload32[0]==0x01000000";
@@ -430,7 +467,7 @@ namespace Zarp.Core
 
         // ------------------------------------------------------------------ конфиг winws2
 
-        /// <summary>Собрать полный набор аргументов winws2 для стратегии.</summary>
+        /// <summary>Собрать полный набор аргументов winws2 для стратегии WARP.</summary>
         public List<string> BuildArgs(Strategy s, bool restrictToWarpIps)
         {
             var a = new List<string>();
@@ -448,12 +485,53 @@ namespace Zarp.Core
                     break;
             }
             if (restrictToWarpIps) a.Add("--wf-raw-filter=" + WarpIpFilter(ExtraAddresses));
+            AddScripts(a, s);
+            return a;
+        }
+
+        /// <summary>
+        /// Набор аргументов winws2 для пары «стратегия + сервер». Перехватывается только соединение с этим сервером: его адрес и порт,
+        /// в обе стороны (ответы нужны winws2 для отслеживания соединения). Диапазоны WARP и свои эндпоинты WARP здесь ни при чём.
+        /// </summary>
+        public List<string> BuildArgs(Strategy s, ZapretTarget target)
+        {
+            if (target == null) throw new ArgumentNullException(nameof(target));
+            var ip = target.Ip; // неверный адрес не должен попасть в фильтр: бросает ArgumentException
+            var a = new List<string>();
+            a.Add(target.Quic ? "--wf-raw-part=outbound and udp and udp.DstPort==" + target.Port.ToString(CultureInfo.InvariantCulture) + " and " + QuicInitialPayload
+                              : "--wf-tcp-out=" + target.Port.ToString(CultureInfo.InvariantCulture));
+            a.Add("--wf-raw-filter=" + ServerIpFilter(ip));
+            // по умолчанию winws2 не трогает адреса локальной сети и loopback: сервер в локальной сети или на этом компьютере иначе остался бы без обхода
+            if (IsLocalNetwork(ip)) a.Add("--wf-filter-lan=0");
+            if (IPAddress.IsLoopback(ip)) a.Add("--wf-filter-loopback=0");
+            AddScripts(a, s);
+            return a;
+        }
+
+        static void AddScripts(List<string> a, Strategy s)
+        {
             a.Add("--lua-init=@lua/zapret-lib.lua");
             a.Add("--lua-init=@lua/zapret-antidpi.lua");
             foreach (var b in Blobs)
                 if (Regex.IsMatch(s.Args ?? "", @"\b" + b.Key + @"\b"))
                     a.Add($"--blob={b.Key}:{b.Value}");
-            return a;
+        }
+
+        static string ServerIpFilter(IPAddress ip)
+        {
+            string ver = ip.AddressFamily == AddressFamily.InterNetworkV6 ? "ipv6" : "ip";
+            string text = ip.ToString();
+            return $"{ver} and ({ver}.DstAddr=={text} or {ver}.SrcAddr=={text})";
+        }
+
+        /// <summary>Адреса, которые winws2 по умолчанию исключает из перехвата как локальную сеть (кроме loopback): частные, link-local, ULA.</summary>
+        static bool IsLocalNetwork(IPAddress ip)
+        {
+            var b = ip.GetAddressBytes();
+            if (ip.AddressFamily == AddressFamily.InterNetwork)
+                return b[0] == 10 || (b[0] == 172 && b[1] >= 16 && b[1] <= 31) || (b[0] == 192 && b[1] == 168) || (b[0] == 169 && b[1] == 254);
+            return (b[0] & 0xFE) == 0xFC                          // fc00::/7
+                   || (b[0] == 0xFE && (b[1] & 0xC0) == 0x80);    // fe80::/10
         }
 
         static string WarpIpFilter(IEnumerable<string> extra)
@@ -473,13 +551,29 @@ namespace Zarp.Core
         /// Текст файла конфигурации для `winws2 @file`. winws2 разбирает его через wordexp (как shell),
         /// поэтому наши аргументы берём в одинарные кавычки, а аргументы стратегии пишем как есть.
         /// </summary>
-        public string BuildConfig(Strategy s, bool restrictToWarpIps)
+        public string BuildConfig(Strategy s, bool restrictToWarpIps) => ConfigText(BuildArgs(s, restrictToWarpIps), s);
+
+        /// <summary>То же для пары «стратегия + сервер»: перехватывается только соединение с этим сервером.</summary>
+        public string BuildConfig(Strategy s, ZapretTarget target) => ConfigText(BuildArgs(s, target), s);
+
+        static string ConfigText(IEnumerable<string> ours, Strategy s)
         {
             var sb = new StringBuilder();
-            foreach (var arg in BuildArgs(s, restrictToWarpIps))
+            foreach (var arg in ours)
                 sb.Append('\'').Append(arg.Replace("'", "'\\''")).Append("'\n");
             sb.Append(s.Args.Trim()).Append('\n');
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Аргументы стратегии у работающего winws2 (последняя строка его файла конфигурации) или null, если winws2 не работает.
+        /// По ним после перезапуска Zarp находят, какая из стратегий сейчас включена.
+        /// </summary>
+        public string RunningStrategyArgs()
+        {
+            if (!Running) return null;
+            try { return File.ReadAllLines(CfgFile).LastOrDefault(l => l.Trim().Length > 0)?.Trim(); }
+            catch (IOException) { return null; }
         }
 
         // ------------------------------------------------------------------ запуск
@@ -494,15 +588,22 @@ namespace Zarp.Core
             }
         }
 
-        /// <summary>Запустить winws2 со стратегией. При ошибке возвращает её описание.</summary>
-        public async Task<Msg> StartAsync(Strategy s, bool restrictToWarpIps, CancellationToken ct = default)
+        /// <summary>Запустить winws2 со стратегией WARP. При ошибке возвращает её описание.</summary>
+        public Task<Msg> StartAsync(Strategy s, bool restrictToWarpIps, CancellationToken ct = default) =>
+            StartCoreAsync(s, () => BuildConfig(s, restrictToWarpIps), ct);
+
+        /// <summary>Запустить winws2 для пары «стратегия + сервер»: он перехватывает только соединение с этим сервером. При ошибке возвращает её описание.</summary>
+        public Task<Msg> StartAsync(Strategy s, ZapretTarget target, CancellationToken ct = default) =>
+            StartCoreAsync(s, () => BuildConfig(s, target), ct);
+
+        async Task<Msg> StartCoreAsync(Strategy s, Func<string> config, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
             Stop();
             ApplyPendingUpdate(); // winws2 остановлен - самое время подменить файлы
             if (!s.UsesZapret) return null;
             Msg err;
-            try { err = Installed ? await StartWithRetryAsync(s, restrictToWarpIps, ct) : new Msg("err.zapretMissing"); }
+            try { err = Installed ? await StartWithRetryAsync(config, ct) : new Msg("err.zapretMissing"); }
             catch (OperationCanceledException) { Stop(); throw; }
             catch (Exception e) { Stop(); err = new Msg("err.winwsStart", e.Message); }
             if (err == null)
@@ -511,14 +612,14 @@ namespace Zarp.Core
                 return null;
             }
             if (RollbackUpdate())
-                err = await StartWithRetryAsync(s, restrictToWarpIps, ct);
+                err = await StartWithRetryAsync(config, ct);
             return err;
         }
 
-        async Task<Msg> StartWithRetryAsync(Strategy s, bool restrictToWarpIps, CancellationToken ct)
+        async Task<Msg> StartWithRetryAsync(Func<string> config, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
-            File.WriteAllText(CfgFile, BuildConfig(s, restrictToWarpIps), new UTF8Encoding(false));
+            File.WriteAllText(CfgFile, config(), new UTF8Encoding(false));
             Msg err = null;
             for (int attempt = 0; attempt < 2; attempt++)
             {
@@ -531,6 +632,12 @@ namespace Zarp.Core
         }
 
         Process _shell;
+
+        /// <summary>
+        /// Пауза между проверками, не упал ли winws2 сразу после запуска (12 проверок: около двух секунд). Меняется только в тестах:
+        /// поиск по парам «стратегия + сервер» запускает winws2 десятки раз.
+        /// </summary>
+        internal int SettleDelayMs = 150;
 
         async Task<Msg> StartOnceAsync(CancellationToken ct)
         {
@@ -556,7 +663,7 @@ namespace Zarp.Core
             // winws2 падает сразу, если фильтр/аргументы неверны или драйвер не загрузился
             for (int i = 0; i < 12; i++)
             {
-                await Task.Delay(150, ct);
+                await Task.Delay(SettleDelayMs, ct);
                 if (i >= 3 && !Running) break;
             }
             if (Running) return null;

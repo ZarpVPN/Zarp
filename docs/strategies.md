@@ -4,6 +4,8 @@ A strategy is a WARP tunnel protocol plus a [winws2](https://github.com/bol-van/
 
 Fakes are real packets of services that are not blocked (google.com, vk.com, gosuslugi.ru), because DPI ignores empty ones.
 
+**With your own server** the same strategies are used for the connection to that server instead of WARP: the QUIC ones for Hysteria2 (and XHTTP over `h3`), the TLS ones for everything that starts with a TLS ClientHello over TCP (VLESS, Trojan, XHTTP, Reality). Zarp shows them without the word WARP and with the server in the name (`TLS: split 1,host + Trojan: example.com:443`). A strategy only changes the handshake of the connection it is paired with; nothing here helps against a blocked address, or against a protocol that does not show a ClientHello or a QUIC Initial.
+
 ## QUIC (MASQUE over HTTP/3)
 
 The first packet of the WARP tunnel is a QUIC Initial. These strategies put something harmless in front of it, or hide it from DPI that does not reassemble IP fragments.
