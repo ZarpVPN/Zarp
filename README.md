@@ -20,6 +20,17 @@ One-click Cloudflare WARP for networks that block it. Zarp finds a [zapret2](htt
 [![macOS release](https://img.shields.io/github/v/release/feg55/Zarp-MacOS?label=macOS)](https://github.com/feg55/Zarp-MacOS/releases/latest)
 [![Android release](https://img.shields.io/github/v/release/feg55/Zarp-Android?label=Android)](https://github.com/feg55/Zarp-Android/releases/latest)
 
+
+## 💬 Community & Support
+Have questions, ideas, or feedback?
+Join our [Zarp Community](https://github.com/orgs/ZarpVPN/discussions)!
+
+- ❓ Ask questions and get help
+- 💡 Suggest new features
+- 📢 Follow announcements
+- 🗳️ Vote on upcoming improvements
+
+
 ## Features
 
 - **One button.** The first click searches for the fastest working strategy, later clicks connect right away.
