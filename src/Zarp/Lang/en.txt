@@ -370,6 +370,30 @@ apps.missing = (not found)
 apps.colName = Program
 apps.colPath = Path
 
+# ---- WARP+ subscription
+warpPlus.title = WARP+
+warpPlus.hint = Use an existing WARP+ subscription. Copy the key from Settings > Account in the 1.1.1.1 app on your phone. Connect through Zarp as usual: the selected zapret2 strategy also handles WARP+.
+warpPlus.account = Account: {0}
+warpPlus.key = WARP+ license key
+warpPlus.privacy = The key is stored by the official WARP client. Zarp does not save it to settings or write it to the log.
+warpPlus.invalid = Use a key with three groups of eight letters or digits, separated by hyphens.
+warpPlus.loading = Reading the WARP account...
+warpPlus.applying = Applying the WARP+ license...
+warpPlus.applied = WARP+ is linked to this device. Reconnect through Zarp to use the updated account.
+warpPlus.unconfirmed = WARP accepted the key, but WARP+ could not be confirmed. Refresh the account and check your subscription before reconnecting.
+warpPlus.applyFailed = Could not apply the key. Check your subscription, device limit and access to Cloudflare, then try again.
+warpPlus.accountFailed = Could not read the account. Check that the WARP service is running and try again.
+warpPlus.timeout = WARP did not answer in time. The key may have been applied; refresh the account before trying again.
+warpPlus.busy = Wait for the current operation to finish, then try again.
+warpPlus.noWarp = Cloudflare WARP was not found. Connect through Zarp once to install it, then return here.
+warpPlus.apply = Apply key
+warpPlus.refresh = Refresh account
+warpPlus.unknown = Unknown or not registered
+warpPlus.free = WARP (free)
+warpPlus.plus = WARP+
+warpPlus.unlimited = WARP+ Unlimited
+warpPlus.zerotrust = Cloudflare Zero Trust
+
 # ---- checks of the adapter and leftovers of an earlier run
 err.tunNoTraffic = The Zarp adapter is up, but no traffic goes through it
 log.singboxOrphan = A sing-box from an earlier run is still working and Zarp cannot take it over: stopping it.

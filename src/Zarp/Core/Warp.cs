@@ -12,6 +12,8 @@ using System.Web.Script.Serialization;
 
 namespace Zarp.Core
 {
+    public enum WarpAccountType { Unknown, Free, Plus, Unlimited, ZeroTrust }
+
     /// <summary>Управление клиентом Cloudflare WARP через warp-cli.</summary>
     public sealed class Warp
     {
@@ -105,6 +107,65 @@ namespace Zarp.Core
             r = await Cli("registration new", 30000, ct);
             Log.Write(r.Ok ? L.T("log.warpRegistered") : L.T("log.warpRegisterFailed", r.Output));
             return r.Ok;
+        }
+
+        static readonly Regex LicenseKey = new Regex(@"\A[A-Za-z0-9]{8}-[A-Za-z0-9]{8}-[A-Za-z0-9]{8}\z", RegexOptions.CultureInvariant);
+
+        public static bool IsLicenseValid(string key) => LicenseKey.IsMatch((key ?? "").Trim());
+
+        // registration show содержит ключ, ID и данные устройства: наружу выходит только известный тип аккаунта.
+        internal static WarpAccountType ParseAccountType(string output)
+        {
+            var match = Regex.Match(output ?? "", @"^\s*Account type:[ \t]*([^\r\n]+)", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            switch (match.Groups[1].Value.Trim().ToLowerInvariant())
+            {
+                case "free": return WarpAccountType.Free;
+                case "limited":
+                case "plus":
+                case "warp+": return WarpAccountType.Plus;
+                case "unlimited":
+                case "warp+ unlimited": return WarpAccountType.Unlimited;
+                case "team":
+                case "zero trust": return WarpAccountType.ZeroTrust;
+                default: return WarpAccountType.Unknown;
+            }
+        }
+
+        public async Task<WarpAccountType> ReadAccountAsync(CancellationToken ct = default)
+        {
+            try
+            {
+                var result = await Cli("registration show", ct: ct);
+                return result.Ok ? ParseAccountType(result.Output) : WarpAccountType.Unknown;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch (Exception) { throw new IOException(L.T("warpPlus.accountFailed")); }
+        }
+
+        /// <summary>Привязать устройство к существующей лицензии. Ключ хранит служба WARP, а не Zarp.</summary>
+        public async Task<WarpAccountType> ApplyLicenseAsync(string key, CancellationToken ct = default)
+        {
+            if (!IsLicenseValid(key)) throw new ArgumentException(L.T("warpPlus.invalid"));
+            key = key.Trim(); // строго один безопасный аргумент, без shell и подстановок
+            RunResult result;
+            try
+            {
+                var registration = await Cli("registration show", ct: ct);
+                if (!registration.Ok)
+                {
+                    // Не пересоздаём существующую регистрацию: её удаление отвязало бы подписку и настройки устройства.
+                    result = await Cli("registration new", 30000, ct);
+                    if (!result.Ok) throw new IOException();
+                }
+                result = await Cli("registration license " + key, 30000, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            // Вывод CLI и даже исключение запуска могут содержать ключ. Не прикладываем их к ошибке или журналу.
+            catch (Exception) { throw new IOException(L.T("warpPlus.applyFailed")); }
+            if (result.TimedOut) throw new IOException(L.T("warpPlus.timeout"));
+            if (!result.Ok) throw new IOException(L.T("warpPlus.applyFailed"));
+            try { return await ReadAccountAsync(ct); }
+            catch (IOException) { return WarpAccountType.Unknown; } // команда принята, но тип пока не удалось прочитать
         }
 
         /// <summary>Выставить протокол туннеля под стратегию.</summary>

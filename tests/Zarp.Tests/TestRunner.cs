@@ -75,6 +75,10 @@ static partial class Program
         Add(nameof(TestWarpFilterWithOwnEndpoints), TestWarpFilterWithOwnEndpoints);
         Add(nameof(TestCountryFilterInEngineAsync), () => Wait(TestCountryFilterInEngineAsync));
         Add(nameof(TestOwnEndpointsInEngineAsync), () => Wait(TestOwnEndpointsInEngineAsync));
+        Add(nameof(TestWarpPlusAccountAsync), () => Wait(TestWarpPlusAccountAsync));
+        Add(nameof(TestWarpPlusFailuresAsync), () => Wait(TestWarpPlusFailuresAsync));
+        Add(nameof(TestWarpPlusEngineAsync), () => Wait(TestWarpPlusEngineAsync));
+        Add(nameof(TestWarpPlusForm), TestWarpPlusForm);
         Add(nameof(TestRouteRuleParsing), TestRouteRuleParsing);
         Add(nameof(TestRoutingSettings), TestRoutingSettings);
         Add(nameof(TestRouteCompile), TestRouteCompile);

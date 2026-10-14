@@ -35,6 +35,7 @@ Join our [Zarp Community](https://github.com/orgs/ZarpVPN/discussions)!
 
 - **One button.** The first click searches for the fastest working strategy, later clicks connect right away.
 - **Built for WARP.** Strategies target the WARP handshake: MASQUE over QUIC (HTTP/3) and over TLS (HTTP/2).
+- **WARP+ subscriptions.** Link your existing WARP+ license in **Settings → Server and endpoints → WARP+**, check the account type and reconnect through Zarp. WARP+ uses the same tunnel and zapret2 strategy; the official WARP client keeps the license, not Zarp.
 - **Repeated checks.** Every candidate must pass twice, the second time on a different WARP endpoint when test isolation is on. A quick scan counts only confirmed strategies, and a connection counts only if traffic really goes through WARP.
 - **Self-healing.** If the saved strategy stops working, Zarp tries the other verified ones before searching again.
 - **Countries.** Filter the strategies by Russia, Iran and China, one or several at once, and tag your own strategies with countries. The filter covers the list, scans, auto-connect, rechecks and saved results.
@@ -71,6 +72,8 @@ Download the APK from [Releases](https://github.com/ZarpVPN/Zarp-Android/release
 Settings offer two searches. **Quick scan** (also used by the power button) stops after 3 working strategies; the number is adjustable. **Full scan** tests every strategy: slower, but nothing is skipped, so it finds the fastest one for sure. With your own server a strategy is a pair of a zapret2 strategy and a server: the scans go through all pairs (each strategy against every server of a subscription that it suits), and the number of pairs can be large, so a full scan can take a long time.
 
 **Server and endpoints**, **Routing** and **Per-app proxy** in Settings are described in [connection settings](docs/connection-settings.md). The short version: the official WARP client has no per-app mode and cannot route by country or domain, so routing and per-app proxy work with **your own server** (paste one link or a subscription in **Server and endpoints** and switch it on), while custom endpoints belong to WARP. The country filter works in both modes: with your own server it chooses the zapret2 strategies that are tried against the server. The country filter and the routing presets are independent.
+
+**Have WARP+?** Open **Settings → Server and endpoints**, turn off **Use my own server instead of WARP** and open **WARP+**. Copy your license key from **Settings → Account** in the 1.1.1.1 app on your phone, paste it and press **Apply key**. The window confirms the account type reported by WARP; a successful command alone does not prove that WARP+ is active. Reconnect with Zarp after linking the license. If WARP is not installed yet, connect once to let Zarp install it first. See [WARP+ details and troubleshooting](docs/connection-settings.md#warp-subscription).
 
 Closing the window asks whether to hide Zarp in the tray or quit. Select **Remember my choice** to make that action the default. Settings → **On close** lets you choose **Ask every time**, **Hide to tray** or **Exit the app**. **Exit** in the tray menu always quits.
 
@@ -120,6 +123,7 @@ Zarp does not collect, store or send any personal data, and it has no telemetry.
 - `https://www.cloudflare.com/cdn-cgi/trace`, while testing or connecting, and every 15 seconds while WARP is connected, to check that traffic goes through WARP and to measure latency. With your own server the same page is requested through the server.
 - Only if you use your own server: the connection to that server. Its link, with the password, is kept in `zarp.json` in your data folder and never written to the log.
 - Only if you use a subscription: one `https://` request to the address you set, when you save it, press Save again to refresh it, or connect with a list that is older than 12 hours. The token in that address is kept in `zarp.json` and never written to the log; the list of servers it returns is kept in `subscription.json`.
+- Only if you apply a WARP+ key: Zarp passes it to the official local `warp-cli`, which contacts Cloudflare to link the device. Zarp does not store the key in its settings or log, and displays only a known account type from the registration response. Cloudflare's client manages and retains the license independently of Zarp.
 - Only if you press Download in **GeoIP and GeoSite**: the address you set there. By default these are `https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat` and `.../geosite.dat`.
 - `https://downloads.cloudflareclient.com/`, only if Cloudflare WARP is missing and you agreed to install it, to download the official installer.
 - `https://github.com/bol-van/zapret2/releases` (the GitHub API as a fallback), to check for and download zapret2 updates. Turn off **Update zapret2 automatically** in Settings to disable this.

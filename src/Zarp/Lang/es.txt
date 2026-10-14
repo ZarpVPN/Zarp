@@ -368,6 +368,30 @@ apps.missing = (no encontrado)
 apps.colName = Programa
 apps.colPath = Ruta
 
+# ---- WARP+ subscription
+warpPlus.title = WARP+
+warpPlus.hint = Usa tu suscripción WARP+. Copia la clave en Ajustes > Cuenta de la app 1.1.1.1 del teléfono. Conéctate con Zarp como siempre: la estrategia zapret2 elegida también se aplica a WARP+.
+warpPlus.account = Cuenta: {0}
+warpPlus.key = Clave de licencia WARP+
+warpPlus.privacy = El cliente oficial WARP guarda la clave. Zarp no la guarda en los ajustes ni la escribe en el registro.
+warpPlus.invalid = Usa una clave de tres grupos de ocho letras o dígitos separados por guiones.
+warpPlus.loading = Consultando la cuenta WARP...
+warpPlus.applying = Aplicando la licencia WARP+...
+warpPlus.applied = WARP+ está vinculado a este dispositivo. Vuelve a conectarte con Zarp para usar la cuenta actualizada.
+warpPlus.unconfirmed = WARP aceptó la clave, pero no se pudo confirmar WARP+. Actualiza la cuenta y comprueba tu suscripción antes de volver a conectarte.
+warpPlus.applyFailed = No se pudo aplicar la clave. Comprueba la suscripción, el límite de dispositivos y el acceso a Cloudflare, y vuelve a intentarlo.
+warpPlus.accountFailed = No se pudo consultar la cuenta. Comprueba que el servicio WARP esté activo y vuelve a intentarlo.
+warpPlus.timeout = WARP no respondió a tiempo. La clave puede haberse aplicado; actualiza la cuenta antes de volver a intentarlo.
+warpPlus.busy = Espera a que termine la operación actual y vuelve a intentarlo.
+warpPlus.noWarp = No se encontró Cloudflare WARP. Conéctate una vez con Zarp para instalarlo y vuelve aquí.
+warpPlus.apply = Aplicar clave
+warpPlus.refresh = Actualizar cuenta
+warpPlus.unknown = Desconocida o sin registrar
+warpPlus.free = WARP (gratis)
+warpPlus.plus = WARP+
+warpPlus.unlimited = WARP+ Unlimited
+warpPlus.zerotrust = Cloudflare Zero Trust
+
 # ---- checks of the adapter and leftovers of an earlier run
 err.tunNoTraffic = El adaptador Zarp está activo, pero no pasa tráfico por él
 log.singboxOrphan = Queda un sing-box de una ejecución anterior que Zarp no puede retomar: se detiene.

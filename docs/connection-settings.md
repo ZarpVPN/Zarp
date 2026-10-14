@@ -44,6 +44,22 @@ The server replaces WARP: Zarp does not register a WARP device and does not need
 
 The engine is [sing-box 1.13.14](https://github.com/SagerNet/sing-box/tree/v1.13.14), GPL-3.0-or-later, embedded into `Zarp.exe` and started as a separate process. sing-box cannot speak XHTTP, so for XHTTP links it hands the traffic to [Xray-core 26.7.28](https://github.com/XTLS/Xray-core/tree/v26.7.28) (MPL-2.0, with GPL-3.0-or-later modules inside), which is embedded and started the same way, and only for such links. See [third-party notices](../THIRD_PARTY_NOTICES.md).
 
+## WARP+ subscription
+
+In **Settings → Server and endpoints**, turn off the own-server toggle and press **WARP+**. This is a license for the official Cloudflare WARP client, separate from a subscription URL for your own servers.
+
+1. Connect through Zarp once if Cloudflare WARP is not installed yet; Zarp offers to install it.
+2. Copy the key from **Settings → Account** in the 1.1.1.1 app on the phone that has your WARP+ subscription.
+3. Paste the key in the masked field and press **Apply key**. It has three groups of eight letters or digits separated by hyphens.
+4. Check the reported account: **WARP+** or **WARP+ Unlimited**. **Refresh account** reads it again without changing anything. If the key was accepted but the account remains free or unknown, Zarp says that WARP+ is unconfirmed.
+5. Disconnect and reconnect through Zarp. The WARP+ tunnel uses the same endpoints, transport and selected zapret2 strategy as free WARP. The connection check already accepts both `warp=on` and `warp=plus`.
+
+Zarp uses `warp-cli registration license <KEY>` and reads the account type with `warp-cli registration show`, following [Cloudflare's CLI instructions](https://developers.cloudflare.com/warp-client/get-started/linux/#enable-warp-unlimited). It reuses an existing device registration; it creates one only when the registration check fails. It never deletes a registration to replace the key. Account commands are serialized with connection operations and do not stop a running tunnel or zapret2. Changing the license does not reset strategy results. A license already linked in the official WARP application is used automatically, even without opening this window.
+
+The official WARP service retains the key. Zarp does not persist it in `zarp.json`, a separate license file or its log. Registration responses contain private account and device details: only the recognized account type is displayed. On failure the raw CLI output is suppressed, and the key remains in the masked field so you can retry; after a successful command or closing the window the field is cleared.
+
+If applying fails, check your subscription, its device limit and access to Cloudflare. If the account service is blocked, first connect with free WARP through Zarp, then apply the key over the working connection. A timeout may mean the key was applied even though the reply was lost: refresh the account before retrying. The subscription is purchased and managed with Cloudflare; removing Zarp does not cancel it. Per-app proxy and routing rules still require your own server. A WARP+ subscription does not guarantee that a strategy bypasses your provider's DPI.
+
 ## Routing
 
 Open **Settings → Routing**, switch the rules on and choose one preset. The built-in presets (local networks, Russia, Iran, China) send local addresses and the addresses of the country directly, and everything else goes through the server. **Edit** opens the three groups **Direct**, **Proxy** and **Block**, one rule per line. You can edit the built-in presets and reset them, and create and delete your own. Priority is **Block, then Proxy, then Direct**. Traffic that no rule matches goes through the server, with one exception made for a desktop: local network addresses stay direct unless a rule says otherwise, so the router, printers and file shares keep working.

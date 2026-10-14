@@ -368,6 +368,30 @@ apps.missing = (не найдена)
 apps.colName = Программа
 apps.colPath = Путь
 
+# ---- WARP+ subscription
+warpPlus.title = WARP+
+warpPlus.hint = Подключите имеющуюся подписку WARP+. Скопируйте ключ в приложении 1.1.1.1 на телефоне: Настройки > Аккаунт. Подключайтесь через Zarp как обычно: выбранная стратегия zapret2 работает и с WARP+.
+warpPlus.account = Аккаунт: {0}
+warpPlus.key = Лицензионный ключ WARP+
+warpPlus.privacy = Ключ хранит официальный клиент WARP. Zarp не сохраняет его в настройках и не записывает в журнал.
+warpPlus.invalid = Ключ должен состоять из трёх групп по восемь латинских букв или цифр, разделённых дефисами.
+warpPlus.loading = Проверка аккаунта WARP...
+warpPlus.applying = Применение лицензии WARP+...
+warpPlus.applied = WARP+ привязан к этому устройству. Переподключитесь через Zarp, чтобы использовать обновлённый аккаунт.
+warpPlus.unconfirmed = WARP принял ключ, но подтвердить WARP+ не удалось. Обновите данные аккаунта и проверьте подписку перед переподключением.
+warpPlus.applyFailed = Не удалось применить ключ. Проверьте подписку, лимит устройств и доступ к Cloudflare, затем повторите попытку.
+warpPlus.accountFailed = Не удалось прочитать данные аккаунта. Проверьте, что служба WARP запущена, и повторите попытку.
+warpPlus.timeout = WARP не ответил вовремя. Ключ мог примениться; обновите данные аккаунта перед повторной попыткой.
+warpPlus.busy = Дождитесь завершения текущей операции и повторите попытку.
+warpPlus.noWarp = Cloudflare WARP не найден. Подключитесь через Zarp один раз для его установки, затем вернитесь сюда.
+warpPlus.apply = Применить ключ
+warpPlus.refresh = Обновить аккаунт
+warpPlus.unknown = Неизвестен или не зарегистрирован
+warpPlus.free = WARP (бесплатный)
+warpPlus.plus = WARP+
+warpPlus.unlimited = WARP+ Unlimited
+warpPlus.zerotrust = Cloudflare Zero Trust
+
 # ---- checks of the adapter and leftovers of an earlier run
 err.tunNoTraffic = Адаптер Zarp поднялся, но трафик через него не идёт
 log.singboxOrphan = От прошлого запуска остался sing-box, который Zarp не может подхватить: останавливаю его.

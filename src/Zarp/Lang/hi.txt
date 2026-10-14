@@ -368,6 +368,30 @@ apps.missing = (नहीं मिला)
 apps.colName = प्रोग्राम
 apps.colPath = पथ
 
+# ---- WARP+ subscription
+warpPlus.title = WARP+
+warpPlus.hint = अपनी मौजूदा WARP+ सदस्यता का उपयोग करें। फ़ोन के 1.1.1.1 ऐप में सेटिंग > खाता से कुंजी कॉपी करें। हमेशा की तरह Zarp से कनेक्ट करें: चुनी गई zapret2 रणनीति WARP+ के लिए भी काम करती है।
+warpPlus.account = खाता: {0}
+warpPlus.key = WARP+ लाइसेंस कुंजी
+warpPlus.privacy = कुंजी आधिकारिक WARP क्लाइंट में रहती है। Zarp इसे सेटिंग में नहीं सहेजता और लॉग में नहीं लिखता।
+warpPlus.invalid = कुंजी में आठ अंग्रेज़ी अक्षरों या अंकों के तीन समूह होने चाहिए, जिनके बीच हाइफ़न हो।
+warpPlus.loading = WARP खाता पढ़ा जा रहा है...
+warpPlus.applying = WARP+ लाइसेंस लागू हो रहा है...
+warpPlus.applied = WARP+ इस डिवाइस से जुड़ गया है। अपडेट किए गए खाते का उपयोग करने के लिए Zarp से दोबारा कनेक्ट करें।
+warpPlus.unconfirmed = WARP ने कुंजी स्वीकार की, लेकिन WARP+ की पुष्टि नहीं हुई। दोबारा कनेक्ट करने से पहले खाता रीफ़्रेश करें और सदस्यता जाँचें।
+warpPlus.applyFailed = कुंजी लागू नहीं हुई। सदस्यता, डिवाइस सीमा और Cloudflare तक पहुँच जाँचें, फिर प्रयास करें।
+warpPlus.accountFailed = खाता पढ़ा नहीं जा सका। जाँचें कि WARP सेवा चल रही है, फिर प्रयास करें।
+warpPlus.timeout = WARP ने समय पर जवाब नहीं दिया। कुंजी लागू हो सकती है; दोबारा प्रयास करने से पहले खाता रीफ़्रेश करें।
+warpPlus.busy = मौजूदा प्रक्रिया पूरी होने दें, फिर प्रयास करें।
+warpPlus.noWarp = Cloudflare WARP नहीं मिला। इसे इंस्टॉल करने के लिए एक बार Zarp से कनेक्ट करें, फिर यहाँ लौटें।
+warpPlus.apply = कुंजी लागू करें
+warpPlus.refresh = खाता रीफ़्रेश करें
+warpPlus.unknown = अज्ञात या पंजीकृत नहीं
+warpPlus.free = WARP (मुफ़्त)
+warpPlus.plus = WARP+
+warpPlus.unlimited = WARP+ Unlimited
+warpPlus.zerotrust = Cloudflare Zero Trust
+
 # ---- checks of the adapter and leftovers of an earlier run
 err.tunNoTraffic = Zarp एडाप्टर चालू है, लेकिन उससे कोई ट्रैफ़िक नहीं जा रहा
 log.singboxOrphan = पिछली बार का sing-box अब भी चल रहा है और Zarp उसे संभाल नहीं सकता: उसे रोका जा रहा है।

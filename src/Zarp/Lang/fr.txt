@@ -368,6 +368,30 @@ apps.missing = (introuvable)
 apps.colName = Programme
 apps.colPath = Chemin
 
+# ---- WARP+ subscription
+warpPlus.title = WARP+
+warpPlus.hint = Utilisez votre abonnement WARP+. Copiez la clé dans Réglages > Compte de l’app 1.1.1.1 sur votre téléphone. Connectez-vous avec Zarp comme d’habitude : la stratégie zapret2 choisie s’applique aussi à WARP+.
+warpPlus.account = Compte : {0}
+warpPlus.key = Clé de licence WARP+
+warpPlus.privacy = Le client officiel WARP conserve la clé. Zarp ne l’enregistre ni dans les réglages ni dans le journal.
+warpPlus.invalid = Utilisez une clé composée de trois groupes de huit lettres ou chiffres, séparés par des tirets.
+warpPlus.loading = Lecture du compte WARP...
+warpPlus.applying = Application de la licence WARP+...
+warpPlus.applied = WARP+ est associé à cet appareil. Reconnectez-vous avec Zarp pour utiliser le compte mis à jour.
+warpPlus.unconfirmed = WARP a accepté la clé, mais WARP+ n’a pas pu être confirmé. Actualisez le compte et vérifiez votre abonnement avant de vous reconnecter.
+warpPlus.applyFailed = Impossible d’appliquer la clé. Vérifiez l’abonnement, la limite d’appareils et l’accès à Cloudflare, puis réessayez.
+warpPlus.accountFailed = Impossible de lire le compte. Vérifiez que le service WARP fonctionne, puis réessayez.
+warpPlus.timeout = WARP n’a pas répondu à temps. La clé a peut-être été appliquée ; actualisez le compte avant de réessayer.
+warpPlus.busy = Attendez la fin de l’opération en cours, puis réessayez.
+warpPlus.noWarp = Cloudflare WARP est introuvable. Connectez-vous une fois avec Zarp pour l’installer, puis revenez ici.
+warpPlus.apply = Appliquer la clé
+warpPlus.refresh = Actualiser le compte
+warpPlus.unknown = Inconnu ou non enregistré
+warpPlus.free = WARP (gratuit)
+warpPlus.plus = WARP+
+warpPlus.unlimited = WARP+ Unlimited
+warpPlus.zerotrust = Cloudflare Zero Trust
+
 # ---- checks of the adapter and leftovers of an earlier run
 err.tunNoTraffic = L’adaptateur Zarp est actif, mais aucun trafic ne le traverse
 log.singboxOrphan = Un sing-box d’une exécution précédente tourne encore et Zarp ne peut pas le reprendre : arrêt.

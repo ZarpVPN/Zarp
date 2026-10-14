@@ -368,6 +368,30 @@ apps.missing = (não encontrado)
 apps.colName = Programa
 apps.colPath = Caminho
 
+# ---- WARP+ subscription
+warpPlus.title = WARP+
+warpPlus.hint = Use sua assinatura WARP+. Copie a chave em Configurações > Conta no app 1.1.1.1 do celular. Conecte pelo Zarp como sempre: a estratégia zapret2 escolhida também funciona com WARP+.
+warpPlus.account = Conta: {0}
+warpPlus.key = Chave de licença WARP+
+warpPlus.privacy = O cliente oficial WARP armazena a chave. O Zarp não a salva nas configurações nem a escreve no log.
+warpPlus.invalid = Use uma chave com três grupos de oito letras ou dígitos separados por hífens.
+warpPlus.loading = Consultando a conta WARP...
+warpPlus.applying = Aplicando a licença WARP+...
+warpPlus.applied = O WARP+ está vinculado a este dispositivo. Reconecte pelo Zarp para usar a conta atualizada.
+warpPlus.unconfirmed = O WARP aceitou a chave, mas não foi possível confirmar o WARP+. Atualize a conta e confira sua assinatura antes de reconectar.
+warpPlus.applyFailed = Não foi possível aplicar a chave. Verifique a assinatura, o limite de dispositivos e o acesso à Cloudflare e tente novamente.
+warpPlus.accountFailed = Não foi possível consultar a conta. Confira se o serviço WARP está em execução e tente novamente.
+warpPlus.timeout = O WARP não respondeu a tempo. A chave pode ter sido aplicada; atualize a conta antes de tentar novamente.
+warpPlus.busy = Aguarde a operação atual terminar e tente novamente.
+warpPlus.noWarp = Cloudflare WARP não encontrado. Conecte pelo Zarp uma vez para instalá-lo e volte aqui.
+warpPlus.apply = Aplicar chave
+warpPlus.refresh = Atualizar conta
+warpPlus.unknown = Desconhecida ou não registrada
+warpPlus.free = WARP (grátis)
+warpPlus.plus = WARP+
+warpPlus.unlimited = WARP+ Unlimited
+warpPlus.zerotrust = Cloudflare Zero Trust
+
 # ---- checks of the adapter and leftovers of an earlier run
 err.tunNoTraffic = O adaptador Zarp está ativo, mas nenhum tráfego passa por ele
 log.singboxOrphan = Sobrou um sing-box de uma execução anterior que o Zarp não consegue assumir: parando.

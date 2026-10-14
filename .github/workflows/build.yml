@@ -3,7 +3,7 @@ name: Build
 on:
   push:
     branches: [main, master]
-    tags: ['v*']
+    tags: ['v*', '*_Pre-release_*']
   pull_request:
   workflow_dispatch:
 
@@ -56,7 +56,11 @@ jobs:
         id: ver
         shell: pwsh   # pwsh пишет GITHUB_OUTPUT в UTF-8 (Windows PowerShell 5 - в UTF-16)
         run: |
-          if ('${{ github.ref_type }}' -eq 'tag') { $v = '${{ github.ref_name }}'.TrimStart('v') } else { $v = '0.0.0-dev.${{ github.run_number }}' }
+          if ('${{ github.ref_type }}' -eq 'tag') {
+            $v = '${{ github.ref_name }}'.TrimStart('v') -replace '_Pre-release_(\d+)$', '-pre.$1'
+          } else {
+            $v = '0.0.0-dev.${{ github.run_number }}'
+          }
           "version=$v" >> $env:GITHUB_OUTPUT
 
       - name: Build
@@ -156,6 +160,8 @@ jobs:
         with:
           files: out/Zarp.exe
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          make_latest: ${{ !contains(github.ref_name, '-') }}
           body: |
             ${{ vars.SIGNPATH_ENABLED == 'true' && 'This release is Authenticode-signed. Verify the publisher in the Digital Signatures tab.' || 'This release is unsigned. Windows SmartScreen may show an unknown-publisher warning.' }}
 

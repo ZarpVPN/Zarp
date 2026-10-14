@@ -71,6 +71,7 @@ namespace Zarp.Core
         volatile bool _foreignVpn;
         readonly SemaphoreSlim _busy = new SemaphoreSlim(1, 1);
         volatile bool _stopping;
+        volatile bool _warpAccountBusy;
         Task _shutdownTask;
         readonly CancellationTokenSource _lifetime = new CancellationTokenSource();
         bool _backgroundStarted;
@@ -196,8 +197,48 @@ namespace Zarp.Core
             return true;
         }
 
-        public bool IsBusy => State == EngineState.Preparing || State == EngineState.Searching
+        public bool IsBusy => _warpAccountBusy || State == EngineState.Preparing || State == EngineState.Searching
                               || State == EngineState.Connecting || State == EngineState.Disconnecting;
+
+        public Task<WarpAccountType> ReadWarpAccountAsync(CancellationToken ct = default) => WarpAccountAsync(null, ct);
+
+        public Task<WarpAccountType> ApplyWarpLicenseAsync(string key, CancellationToken ct = default)
+        {
+            if (!Warp.IsLicenseValid(key)) throw new ArgumentException(L.T("warpPlus.invalid"));
+            return WarpAccountAsync(key.Trim(), ct);
+        }
+
+        /// <summary>Сериализовать команды аккаунта с поиском, мониторингом и выходом, сохранив работающий туннель и winws2.</summary>
+        async Task<WarpAccountType> WarpAccountAsync(string key, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (_stopping || IsBusy) throw new InvalidOperationException(L.T("warpPlus.busy"));
+            if (!await _busy.WaitAsync(0, ct))
+            {
+                var observation = _observation;
+                if (observation == null) throw new InvalidOperationException(L.T("warpPlus.busy"));
+                try { observation.Cancel(); } catch (ObjectDisposedException) { }
+                await _busy.WaitAsync(ct);
+            }
+            try
+            {
+                if (_stopping) throw new OperationCanceledException();
+                if (!Warp.Installed) Warp.Locate();
+                if (!Warp.Installed) throw new InvalidOperationException(L.T("warpPlus.noWarp"));
+                _cts = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetime.Token);
+                _warpAccountBusy = true;
+                Changed?.Invoke();
+                return key == null ? await Warp.ReadAccountAsync(_cts.Token) : await Warp.ApplyLicenseAsync(key, _cts.Token);
+            }
+            finally
+            {
+                _cts?.Dispose();
+                _cts = null;
+                _warpAccountBusy = false;
+                _busy.Release();
+                Changed?.Invoke();
+            }
+        }
 
         static Msg M(string key, params object[] args) => new Msg(key, args);
 

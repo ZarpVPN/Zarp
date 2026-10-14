@@ -368,6 +368,30 @@ apps.missing = (nicht gefunden)
 apps.colName = Programm
 apps.colPath = Pfad
 
+# ---- WARP+ subscription
+warpPlus.title = WARP+
+warpPlus.hint = Nutzen Sie Ihr WARP+-Abonnement. Kopieren Sie den Schlüssel in der 1.1.1.1-App auf dem Handy unter Einstellungen > Konto. Verbinden Sie sich wie gewohnt über Zarp: Die gewählte zapret2-Strategie gilt auch für WARP+.
+warpPlus.account = Konto: {0}
+warpPlus.key = WARP+-Lizenzschlüssel
+warpPlus.privacy = Der offizielle WARP-Client speichert den Schlüssel. Zarp schreibt ihn weder in die Einstellungen noch ins Protokoll.
+warpPlus.invalid = Der Schlüssel muss aus drei Gruppen mit je acht Buchstaben oder Ziffern bestehen, getrennt durch Bindestriche.
+warpPlus.loading = WARP-Konto wird gelesen...
+warpPlus.applying = WARP+-Lizenz wird angewendet...
+warpPlus.applied = WARP+ ist mit diesem Gerät verknüpft. Verbinden Sie sich erneut über Zarp, um das aktualisierte Konto zu nutzen.
+warpPlus.unconfirmed = WARP hat den Schlüssel angenommen, aber WARP+ wurde nicht bestätigt. Aktualisieren Sie das Konto und prüfen Sie Ihr Abonnement vor dem erneuten Verbinden.
+warpPlus.applyFailed = Schlüssel konnte nicht angewendet werden. Prüfen Sie Abonnement, Gerätelimit und den Zugang zu Cloudflare und versuchen Sie es erneut.
+warpPlus.accountFailed = Konto konnte nicht gelesen werden. Prüfen Sie, ob der WARP-Dienst läuft, und versuchen Sie es erneut.
+warpPlus.timeout = WARP hat nicht rechtzeitig geantwortet. Der Schlüssel könnte angewendet worden sein; aktualisieren Sie zuerst das Konto.
+warpPlus.busy = Warten Sie auf das Ende des laufenden Vorgangs und versuchen Sie es erneut.
+warpPlus.noWarp = Cloudflare WARP wurde nicht gefunden. Verbinden Sie sich einmal über Zarp, um es zu installieren, und kehren Sie dann zurück.
+warpPlus.apply = Schlüssel nutzen
+warpPlus.refresh = Konto aktualisieren
+warpPlus.unknown = Unbekannt oder nicht registriert
+warpPlus.free = WARP (kostenlos)
+warpPlus.plus = WARP+
+warpPlus.unlimited = WARP+ Unlimited
+warpPlus.zerotrust = Cloudflare Zero Trust
+
 # ---- checks of the adapter and leftovers of an earlier run
 err.tunNoTraffic = Der Zarp-Adapter ist aktiv, aber es fließt kein Datenverkehr darüber
 log.singboxOrphan = Ein sing-box aus einem früheren Lauf läuft noch und Zarp kann ihn nicht übernehmen: wird beendet.

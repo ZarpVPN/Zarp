@@ -23,7 +23,7 @@ namespace Zarp.UI
         readonly Label _endpointStatus = new Label();
         readonly Panel _serverPanel = new Panel();
         readonly Panel _warpPanel = new Panel();
-        readonly DarkButton _reset, _save, _close;
+        readonly DarkButton _reset, _save, _close, _warpPlus;
         readonly int _statusHeight;
         bool _loading;
         // загрузка подписки идёт (кнопка «Сохранить» ждёт) и её последняя неудача: показывается, пока текст в поле не изменили
@@ -83,8 +83,11 @@ namespace Zarp.UI
             _reset = Theme.FlatButton(L.T("endpoint.reset"), 160);
             _reset.Location = new Point(0, _endpointStatus.Bottom + 6);
             _reset.Click += (s, e) => _endpoints.Text = "";
+            _warpPlus = Theme.FlatButton(L.T("warpPlus.title"), 150);
+            _warpPlus.Location = new Point(W - _warpPlus.Width, _reset.Top);
+            _warpPlus.Click += (s, e) => { using (var form = new WarpPlusForm(_engine)) form.ShowDialog(this); };
             _warpPanel.Size = new Size(W, _reset.Bottom + 2);
-            _warpPanel.Controls.AddRange(new Control[] { warpTitle, warpHint, _endpoints, _endpointStatus, _reset });
+            _warpPanel.Controls.AddRange(new Control[] { warpTitle, warpHint, _endpoints, _endpointStatus, _reset, _warpPlus });
 
             int panelHeight = Math.Max(_serverPanel.Height, _warpPanel.Height);
             _serverPanel.Location = _warpPanel.Location = new Point(Pad, _useProxy.Bottom + 10);
@@ -157,6 +160,7 @@ namespace Zarp.UI
             _endpointStatus.ForeColor = Theme.Bad;
             _endpointStatus.Text = endpointsOk ? "" : L.T("endpoint.invalid");
             _reset.Visible = _endpoints.Text.Trim().Length > 0;
+            _warpPlus.Enabled = !_engine.IsBusy && !_loadingSubscription;
 
             var c = _engine.Config;
             bool dirty = _useProxy.Checked != c.UseProxy || _link.Text.Trim() != c.ProxyUri.Trim() || _ipv6.Checked != c.ProxyIpv6

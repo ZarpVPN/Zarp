@@ -368,6 +368,30 @@ apps.missing = （未找到）
 apps.colName = 程序
 apps.colPath = 路径
 
+# ---- WARP+ subscription
+warpPlus.title = WARP+
+warpPlus.hint = 使用已有的 WARP+ 订阅。在手机 1.1.1.1 应用的“设置 > 账户”中复制密钥。照常通过 Zarp 连接：所选 zapret2 策略同样适用于 WARP+。
+warpPlus.account = 账户：{0}
+warpPlus.key = WARP+ 许可证密钥
+warpPlus.privacy = 密钥由官方 WARP 客户端保存。Zarp 不会将其保存到设置或写入日志。
+warpPlus.invalid = 密钥应由三组八位英文字母或数字组成，各组之间用连字符分隔。
+warpPlus.loading = 正在读取 WARP 账户...
+warpPlus.applying = 正在应用 WARP+ 许可证...
+warpPlus.applied = WARP+ 已关联此设备。请通过 Zarp 重新连接以使用更新后的账户。
+warpPlus.unconfirmed = WARP 已接受密钥，但无法确认 WARP+。请刷新账户并检查订阅，然后重新连接。
+warpPlus.applyFailed = 无法应用密钥。请检查订阅、设备数量限制及 Cloudflare 连接，然后重试。
+warpPlus.accountFailed = 无法读取账户。请检查 WARP 服务是否正在运行，然后重试。
+warpPlus.timeout = WARP 未及时响应。密钥可能已应用；请先刷新账户再重试。
+warpPlus.busy = 请等待当前操作完成后重试。
+warpPlus.noWarp = 未找到 Cloudflare WARP。请先通过 Zarp 连接一次以安装，然后返回此处。
+warpPlus.apply = 应用密钥
+warpPlus.refresh = 刷新账户
+warpPlus.unknown = 未知或未注册
+warpPlus.free = WARP（免费）
+warpPlus.plus = WARP+
+warpPlus.unlimited = WARP+ Unlimited
+warpPlus.zerotrust = Cloudflare Zero Trust
+
 # ---- checks of the adapter and leftovers of an earlier run
 err.tunNoTraffic = Zarp 适配器已启动，但没有流量通过
 log.singboxOrphan = 上次运行遗留的 sing-box 仍在工作，Zarp 无法接管：正在停止它。

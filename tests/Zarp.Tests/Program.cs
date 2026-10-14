@@ -363,6 +363,23 @@ static partial class Program
                     state.SetValue(engine, EngineState.Idle);
                     update.Invoke(settings, null);
                 }
+                using (var warpPlus = NewForm("WarpPlusForm", engine))
+                {
+                    PositionOffscreen(warpPlus);
+                    warpPlus.Show();
+                    PumpUntil(() => GetPrivate<Button>(warpPlus, "_refresh").Enabled);
+                    CheckLayout(warpPlus, code + " WARP+");
+                    var status = GetPrivate<Label>(warpPlus, "_status");
+                    foreach (string key in new[] { "invalid", "loading", "applying", "applied", "unconfirmed", "applyFailed", "accountFailed", "timeout", "busy", "noWarp" })
+                    {
+                        status.Text = L.T("warpPlus." + key);
+                        CheckLayout(warpPlus, code + " WARP+ " + key);
+                    }
+                    GetPrivate<Label>(warpPlus, "_account").Text = L.T("warpPlus.account", L.T("warpPlus.unlimited"));
+                    warpPlus.GetType().GetMethod("ShowStatus", PrivateInstance).Invoke(warpPlus, new object[] { L.T("warpPlus.applied"), false });
+                    CheckLayout(warpPlus, code + " WARP+ Unlimited");
+                    SaveImage(warpPlus, "warp-plus-" + code + ".png");
+                }
                 // сервер и эндпоинты: обе страницы окна, с подсказкой и с сообщением об ошибке
                 using (var connection = NewForm("ConnectionForm", engine))
                 {
