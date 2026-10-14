@@ -603,7 +603,7 @@ static partial class Program
         string src = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "src", "Zarp"));
         if (!Directory.Exists(src))
             throw new TestSkippedException("Sources not found at " + src + ", key usage was not checked");
-        var pattern = new Regex("\"((?:main|lang|status|hint|tray|dlg|close|settings|col|btn|tip|opt|result|strategy|detail|progress|err|log|filter|country|endpoint|proxy|routing|geo|apps)\\.[A-Za-z0-9]+)\"");
+        var pattern = new Regex("\"((?:main|lang|status|hint|tray|dlg|close|settings|col|btn|tip|opt|result|strategy|detail|progress|err|log|filter|country|endpoint|warpPlus|proxy|routing|geo|apps)\\.[A-Za-z0-9]+)\"");
         var used = new HashSet<string>(Directory.GetFiles(src, "*.cs", SearchOption.AllDirectories)
             .SelectMany(f => pattern.Matches(File.ReadAllText(f)).Cast<Match>().Select(m => m.Groups[1].Value)));
         var defined = new HashSet<string>(L.KeysOf("en"));

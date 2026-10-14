@@ -66,7 +66,7 @@ namespace Zarp.UI
                 var account = apply ? await _engine.ApplyWarpLicenseAsync(_key.Text, _cancel.Token)
                                     : await _engine.ReadWarpAccountAsync(_cancel.Token);
                 if (IsDisposed) return;
-                _account.Text = L.T("warpPlus.account", L.T("warpPlus." + account.ToString().ToLowerInvariant()));
+                _account.Text = L.T("warpPlus.account", AccountName(account));
                 if (apply)
                 {
                     _key.Text = "";
@@ -88,6 +88,18 @@ namespace Zarp.UI
                 }
             }
             finally { _working = false; if (!IsDisposed) UpdateButtons(); }
+        }
+
+        static string AccountName(WarpAccountType account)
+        {
+            switch (account)
+            {
+                case WarpAccountType.Free: return L.T("warpPlus.free");
+                case WarpAccountType.Plus: return L.T("warpPlus.plus");
+                case WarpAccountType.Unlimited: return L.T("warpPlus.unlimited");
+                case WarpAccountType.ZeroTrust: return L.T("warpPlus.zerotrust");
+                default: return L.T("warpPlus.unknown");
+            }
         }
 
         void ShowStatus(string text, bool error = false)
