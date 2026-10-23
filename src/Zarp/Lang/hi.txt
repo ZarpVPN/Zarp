@@ -398,6 +398,12 @@ err.warpDaemon = WARP सेवा ने जवाब नहीं दिया
 err.warpRegistrationCheck = मौजूदा WARP पंजीकरण पढ़ा नहीं जा सका। जाँचें कि WARP सेवा चल रही है और दोबारा प्रयास करें।
 err.warpRegistrationPending = WARP ने अभी पंजीकरण की पुष्टि नहीं की है। प्रतीक्षा करें या WARP सेवा को फिर शुरू करें। मौजूदा पंजीकरण सुरक्षित है।
 err.warpRegistrationCreate = WARP इस डिवाइस को पंजीकृत नहीं कर सका। Cloudflare तक पहुँच जाँचें और दोबारा प्रयास करें।
+log.warpRegistrationProtected = WARP का सीधा पंजीकरण विफल हुआ। Cloudflare API के लिए TLS रणनीतियाँ आज़माई जा रही हैं।
+detail.warpRegistrationStrategy = zapret2 के ज़रिए WARP का पंजीकरण: {0}/{1}, {2}
+log.warpRegistrationStrategy = zapret2 के ज़रिए WARP का पंजीकरण: {0}।
+log.warpRegistrationStrategyFailed = WARP के पंजीकरण के लिए {0} शुरू नहीं हो सका: {1}
+log.warpRegistrationProtectedOk = {0} के ज़रिए WARP पंजीकृत हो गया। टनल की रणनीतियाँ अलग से जाँची जाएँगी।
+log.warpRegistrationProtectedFailed = उपलब्ध TLS रणनीतियों से WARP पंजीकृत नहीं हो सका। Cloudflare तक पहुँच जाँचें या दूसरा नेटवर्क आज़माएँ।
 
 # ---- checks of the adapter and leftovers of an earlier run
 err.tunNoTraffic = Zarp एडाप्टर चालू है, लेकिन उससे कोई ट्रैफ़िक नहीं जा रहा

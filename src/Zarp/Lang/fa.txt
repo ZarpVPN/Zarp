@@ -399,6 +399,12 @@ err.warpDaemon = سرویس WARP پاسخ نداد. سرویس Cloudflare WARP �
 err.warpRegistrationCheck = خواندن ثبت فعلی WARP ممکن نشد. فعال بودن سرویس WARP را بررسی و دوباره تلاش کنید.
 err.warpRegistrationPending = WARP هنوز ثبت را تأیید نکرده است. کمی صبر کنید یا سرویس WARP را راه‌اندازی مجدد کنید. ثبت فعلی حفظ شد.
 err.warpRegistrationCreate = WARP نتوانست این دستگاه را ثبت کند. دسترسی به Cloudflare را بررسی و دوباره تلاش کنید.
+log.warpRegistrationProtected = ثبت مستقیم WARP ناموفق بود. راهبردهای TLS برای API کلادفلر آزمایش می‌شوند.
+detail.warpRegistrationStrategy = ثبت WARP از طریق zapret2: {0}/{1}، {2}
+log.warpRegistrationStrategy = ثبت WARP از طریق zapret2: {0}.
+log.warpRegistrationStrategyFailed = اجرای {0} برای ثبت WARP ممکن نشد: {1}
+log.warpRegistrationProtectedOk = WARP از طریق {0} ثبت شد. راهبردهای اتصال تونل جداگانه آزمایش خواهند شد.
+log.warpRegistrationProtectedFailed = ثبت WARP با راهبردهای TLS موجود ممکن نشد. دسترسی به کلادفلر را بررسی کنید یا شبکهٔ دیگری را امتحان کنید.
 
 err.tunNoTraffic = آداپتور Zarp فعال است، اما ترافیکی از آن عبور نمی‌کند
 log.singboxOrphan = یک sing-box از اجرای قبلی فعال مانده و Zarp نمی‌تواند آن را مدیریت کند؛ متوقف می‌شود.

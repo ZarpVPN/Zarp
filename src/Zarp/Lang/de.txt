@@ -398,6 +398,12 @@ err.warpDaemon = Der WARP-Dienst antwortet nicht. Starten Sie den Cloudflare-WAR
 err.warpRegistrationCheck = Die bestehende WARP-Registrierung konnte nicht gelesen werden. Prüfen Sie, ob der WARP-Dienst läuft, und versuchen Sie es erneut.
 err.warpRegistrationPending = WARP hat die Registrierung noch nicht bestätigt. Warten Sie oder starten Sie den WARP-Dienst neu. Die bestehende Registrierung wurde beibehalten.
 err.warpRegistrationCreate = WARP konnte das Gerät nicht registrieren. Prüfen Sie den Zugang zu Cloudflare und versuchen Sie es erneut.
+log.warpRegistrationProtected = Die direkte WARP-Registrierung ist fehlgeschlagen. TLS-Strategien für die Cloudflare-API werden getestet.
+detail.warpRegistrationStrategy = WARP-Registrierung über zapret2: {0}/{1}, {2}
+log.warpRegistrationStrategy = WARP-Registrierung über zapret2: {0}.
+log.warpRegistrationStrategyFailed = {0} konnte für die WARP-Registrierung nicht gestartet werden: {1}
+log.warpRegistrationProtectedOk = WARP wurde über {0} registriert. Tunnelstrategien werden separat getestet.
+log.warpRegistrationProtectedFailed = WARP konnte mit den verfügbaren TLS-Strategien nicht registriert werden. Prüfen Sie den Zugang zu Cloudflare oder versuchen Sie ein anderes Netzwerk.
 
 # ---- checks of the adapter and leftovers of an earlier run
 err.tunNoTraffic = Der Zarp-Adapter ist aktiv, aber es fließt kein Datenverkehr darüber

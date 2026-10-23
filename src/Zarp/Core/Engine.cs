@@ -147,6 +147,7 @@ namespace Zarp.Core
 
         /// <summary>Стратегии zapret2, из которых составляются пары с сервером. Подменяется в тестах: так набор небольшой и известный.</summary>
         internal Func<List<Strategy>> ZapretStrategies = null;
+        internal Func<CancellationToken, Task<IReadOnlyList<string>>> RegistrationAddresses = WarpRegistrationApi.ResolveAsync;
 
         public void ReloadStrategies()
         {
@@ -228,7 +229,11 @@ namespace Zarp.Core
                 _cts = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetime.Token);
                 _warpAccountBusy = true;
                 Changed?.Invoke();
-                return key == null ? await Warp.ReadAccountAsync(_cts.Token) : await Warp.ApplyLicenseAsync(key, _cts.Token);
+                if (key == null) return await Warp.ReadAccountAsync(_cts.Token);
+                var account = WarpAccountType.Unknown;
+                if (!await EnsureWarpRegistrationAsync(_cts.Token, async () => account = await Warp.ApplyRegisteredLicenseAsync(key, _cts.Token)))
+                    throw new IOException(L.T("warpPlus.applyFailed"));
+                return account;
             }
             finally
             {
@@ -748,12 +753,72 @@ namespace Zarp.Core
             foreach (var other in Zapret.ForeignDpiTools())
                 Log.Write(L.T("log.otherDpi", other));
             if (!AskAboutForeignVpn(searching)) return false;
-            if (!await Warp.EnsureRegisteredAsync(ct))
+            if (!await EnsureWarpRegistrationAsync(ct))
             {
                 Set(EngineState.Idle, Warp.LastRegistrationError ?? M("detail.registerFailed"));
                 return false;
             }
             return true;
+        }
+
+        async Task<bool> EnsureWarpRegistrationAsync(CancellationToken ct, Func<Task> registered = null)
+        {
+            if (await Warp.EnsureRegisteredAsync(ct))
+            {
+                if (registered != null) await registered();
+                return true;
+            }
+            // Не останавливать работающее соединение ради аккаунта и не перебирать стратегии через чужой VPN.
+            if (!Warp.RegistrationCanRetry || Zapret.Running || Proxy.Running || State == EngineState.Connected || FindForeignVpns().Count > 0)
+                return false;
+            var source = ProxyMode ? StrategyFilter.Apply(StrategyCatalog.Load(DataDir), Config.StrategyCountry) : Candidates;
+            var strategies = source.Where(s => !s.IsProxy && s.UsesZapret && s.Transport == WarpTransport.MasqueH2)
+                .OrderByDescending(s => s.Id == Config.SelectedStrategyId)
+                .ThenByDescending(s => Config.Results.TryGetValue(s.Id, out var r) && r.Ok && r.Confirmed).ToList();
+            if (strategies.Count == 0) return false;
+
+            var state = State;
+            var detail = _detail;
+            int total = ProgressTotal, done = ProgressDone;
+            try
+            {
+                Log.Write(L.T("log.warpRegistrationProtected"));
+                if ((!Zapret.Installed || Zapret.EmbeddedIsNewer) && !await InstallZapretAsync(ct) && !Zapret.Installed) return false;
+                var addresses = await RegistrationAddresses(ct);
+                for (int i = 0; i < strategies.Count; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var strategy = strategies[i];
+                    SetDetail(M("detail.warpRegistrationStrategy", i + 1, strategies.Count, strategy));
+                    Log.Write(L.T("log.warpRegistrationStrategy", strategy));
+                    try
+                    {
+                        var error = await Zapret.StartRegistrationAsync(strategy, addresses, ct);
+                        if (error != null)
+                        {
+                            Log.Write(L.T("log.warpRegistrationStrategyFailed", strategy, error));
+                            continue;
+                        }
+                        if (await Warp.RetryRegistrationAsync(ct))
+                        {
+                            Log.Write(L.T("log.warpRegistrationProtectedOk", strategy));
+                            // Привязку WARP+ на новом устройстве выполнить под той же защитой API.
+                            if (registered != null) await registered();
+                            return true;
+                        }
+                        if (!Warp.RegistrationCanRetry) break;
+                    }
+                    finally { Zapret.Stop(); }
+                }
+                Log.Write(L.T("log.warpRegistrationProtectedFailed"));
+                return false;
+            }
+            finally
+            {
+                ProgressTotal = total;
+                ProgressDone = done;
+                Set(state, detail);
+            }
         }
 
         /// <summary>

@@ -398,6 +398,12 @@ err.warpDaemon = Le service WARP n’a pas répondu. Redémarrez le service Clou
 err.warpRegistrationCheck = Impossible de lire l’enregistrement WARP existant. Vérifiez que le service WARP fonctionne, puis réessayez.
 err.warpRegistrationPending = WARP n’a pas encore confirmé l’enregistrement. Patientez ou redémarrez le service WARP, puis réessayez. L’enregistrement existant est conservé.
 err.warpRegistrationCreate = WARP n’a pas pu enregistrer cet appareil. Vérifiez l’accès à Cloudflare, puis réessayez.
+log.warpRegistrationProtected = L’enregistrement direct de WARP a échoué. Essai des stratégies TLS pour l’API Cloudflare.
+detail.warpRegistrationStrategy = Enregistrement de WARP via zapret2 : {0}/{1}, {2}
+log.warpRegistrationStrategy = Enregistrement de WARP via zapret2 : {0}.
+log.warpRegistrationStrategyFailed = Impossible de démarrer {0} pour enregistrer WARP : {1}
+log.warpRegistrationProtectedOk = WARP a été enregistré via {0}. Les stratégies du tunnel seront testées séparément.
+log.warpRegistrationProtectedFailed = WARP n’a pas pu s’enregistrer avec les stratégies TLS disponibles. Vérifiez l’accès à Cloudflare ou essayez un autre réseau.
 
 # ---- checks of the adapter and leftovers of an earlier run
 err.tunNoTraffic = L’adaptateur Zarp est actif, mais aucun trafic ne le traverse

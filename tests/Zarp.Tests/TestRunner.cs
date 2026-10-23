@@ -53,6 +53,11 @@ static partial class Program
         Add(nameof(TestVpnRouteDetection), TestVpnRouteDetection);
         Add(nameof(TestWarpRegistrationRecoveryAsync), () => Wait(TestWarpRegistrationRecoveryAsync));
         Add(nameof(TestWarpRegistrationFailuresAsync), () => Wait(TestWarpRegistrationFailuresAsync));
+        Add(nameof(TestWarpRegistrationApiConfig), TestWarpRegistrationApiConfig);
+        Add(nameof(TestWarpRegistrationProtectedAsync), () => Wait(TestWarpRegistrationProtectedAsync));
+        Add(nameof(TestWarpRegistrationProtectedFailuresAsync), () => Wait(TestWarpRegistrationProtectedFailuresAsync));
+        Add(nameof(TestWarpRegistrationProtectedAccountAsync), () => Wait(TestWarpRegistrationProtectedAccountAsync));
+        Add(nameof(TestWarpRegistrationProtectedConnectAsync), () => Wait(TestWarpRegistrationProtectedConnectAsync));
         Add(nameof(TestPersianTextDirection), TestPersianTextDirection);
         Add(nameof(TestBuiltInStrategies), TestBuiltInStrategies);
         Add(nameof(TestPackedStrategyFiles), TestPackedStrategyFiles);

@@ -398,6 +398,12 @@ err.warpDaemon = WARP 服务未响应。请重启 Cloudflare WARP 服务或 Wind
 err.warpRegistrationCheck = 无法读取现有 WARP 注册。请检查 WARP 服务是否正在运行后重试。
 err.warpRegistrationPending = WARP 尚未确认注册。请稍候或重启 WARP 服务后重试。现有注册已保留。
 err.warpRegistrationCreate = WARP 无法注册此设备。请检查 Cloudflare 连接后重试。
+log.warpRegistrationProtected = WARP 直接注册失败。正在尝试用于 Cloudflare API 的 TLS 策略。
+detail.warpRegistrationStrategy = 通过 zapret2 注册 WARP：{0}/{1}，{2}
+log.warpRegistrationStrategy = 通过 zapret2 注册 WARP：{0}。
+log.warpRegistrationStrategyFailed = 无法启动 {0} 来注册 WARP：{1}
+log.warpRegistrationProtectedOk = WARP 已通过 {0} 注册。隧道策略将另行测试。
+log.warpRegistrationProtectedFailed = WARP 无法通过可用的 TLS 策略注册。请检查 Cloudflare 连接或尝试其他网络。
 
 # ---- checks of the adapter and leftovers of an earlier run
 err.tunNoTraffic = Zarp 适配器已启动，但没有流量通过

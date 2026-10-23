@@ -398,6 +398,12 @@ err.warpDaemon = Служба WARP не ответила. Перезапусти
 err.warpRegistrationCheck = Не удалось прочитать существующую регистрацию WARP. Проверьте, что служба WARP работает, и повторите попытку.
 err.warpRegistrationPending = WARP пока не подтвердил регистрацию. Подождите или перезапустите службу WARP и повторите попытку. Существующая регистрация сохранена.
 err.warpRegistrationCreate = WARP не удалось зарегистрировать устройство. Проверьте доступ к Cloudflare и повторите попытку.
+log.warpRegistrationProtected = Прямая регистрация WARP не удалась. Пробую TLS-стратегии для API Cloudflare.
+detail.warpRegistrationStrategy = Регистрация WARP через zapret2: {0}/{1}, {2}
+log.warpRegistrationStrategy = Регистрация WARP через zapret2: {0}.
+log.warpRegistrationStrategyFailed = Не удалось запустить {0} для регистрации WARP: {1}
+log.warpRegistrationProtectedOk = WARP зарегистрирован через {0}. Стратегии подключения туннеля будут проверены отдельно.
+log.warpRegistrationProtectedFailed = WARP не удалось зарегистрировать с доступными TLS-стратегиями. Проверьте доступ к Cloudflare или попробуйте другую сеть.
 
 # ---- checks of the adapter and leftovers of an earlier run
 err.tunNoTraffic = Адаптер Zarp поднялся, но трафик через него не идёт

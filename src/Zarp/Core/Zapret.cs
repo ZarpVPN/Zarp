@@ -508,6 +508,27 @@ namespace Zarp.Core
             return a;
         }
 
+        /// <summary>Регистрация WARP: HTTPS API, а не ещё не созданный туннель. Только TCP 443 и адреса API.</summary>
+        public List<string> BuildRegistrationArgs(Strategy s, IEnumerable<string> addresses)
+        {
+            if (s.IsProxy || s.Transport != WarpTransport.MasqueH2 || !s.UsesZapret)
+                throw new ArgumentException("Registration requires a TLS strategy", nameof(s));
+            if (addresses == null) throw new ArgumentNullException(nameof(addresses));
+            var ips = addresses.Select(a => new ZapretTarget { Address = a }.Ip).Distinct().ToArray();
+            if (ips.Length == 0 || ips.Any(ip => !WarpRegistrationApi.IsPublicAddress(ip)))
+                throw new ArgumentException("Registration requires public API addresses", nameof(addresses));
+            var args = new List<string>
+            {
+                "--wf-tcp-out=443",
+                "--wf-raw-filter=" + string.Join(" or ", ips.Select(ip => "(" + ServerIpFilter(ip) + ")")),
+                "--hostlist-domains=" + string.Join(",", WarpRegistrationApi.Hosts),
+            };
+            AddScripts(args, s);
+            return args;
+        }
+
+        public string BuildRegistrationConfig(Strategy s, IEnumerable<string> addresses) => ConfigText(BuildRegistrationArgs(s, addresses), s);
+
         static void AddScripts(List<string> a, Strategy s)
         {
             a.Add("--lua-init=@lua/zapret-lib.lua");
@@ -595,6 +616,9 @@ namespace Zarp.Core
         /// <summary>Запустить winws2 для пары «стратегия + сервер»: он перехватывает только соединение с этим сервером. При ошибке возвращает её описание.</summary>
         public Task<Msg> StartAsync(Strategy s, ZapretTarget target, CancellationToken ct = default) =>
             StartCoreAsync(s, () => BuildConfig(s, target), ct);
+
+        internal Task<Msg> StartRegistrationAsync(Strategy s, IReadOnlyList<string> addresses, CancellationToken ct) =>
+            StartCoreAsync(s, () => BuildRegistrationConfig(s, addresses), ct);
 
         async Task<Msg> StartCoreAsync(Strategy s, Func<string> config, CancellationToken ct)
         {

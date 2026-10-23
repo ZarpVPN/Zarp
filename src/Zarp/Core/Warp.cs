@@ -29,6 +29,7 @@ namespace Zarp.Core
         internal int RegistrationRetryDelayMs = 1000;
         DateTime _registrationPendingUntil;
         public Msg LastRegistrationError { get; private set; }
+        internal bool RegistrationCanRetry { get; private set; }
 
         // последний выставленный транспорт - чтобы не дёргать настройки WARP без нужды
         WarpTransport? _transport;
@@ -105,6 +106,7 @@ namespace Zarp.Core
         public async Task<bool> EnsureRegisteredAsync(CancellationToken ct = default)
         {
             LastRegistrationError = null;
+            RegistrationCanRetry = false;
             var r = await ReadRegistrationAsync(ct, waitForCreation: DateTime.UtcNow < _registrationPendingUntil);
             if (r.Ok) return true;
             if (!RegistrationMissing(r))
@@ -124,10 +126,26 @@ namespace Zarp.Core
                 Log.Write(L.T("log.warpRegistered"));
                 return true;
             }
-            bool pending = created.Ok || DaemonUnavailable(created) || Regex.IsMatch(created.Output ?? "",
+            bool existing = Regex.IsMatch(created.Output ?? "",
                 @"old registration is still around|already.?registered|registration already exists|existing.?registration", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            bool pending = created.Ok || DaemonUnavailable(created) || existing;
+            if (!pending) _registrationPendingUntil = DateTime.MinValue;
+            // Повтор допустим только после сетевой ошибки создания и подтверждения, что регистрации всё ещё нет.
+            // Ошибка чтения IPC или ответ о прежней регистрации не разрешают создавать новую.
+            RegistrationCanRetry = RegistrationMissing(r) && !existing && !created.Ok && (DaemonUnavailable(created) ||
+                Regex.IsMatch(created.Output ?? "", @"connectivity|network|connection|timed out|timeout|\bDNS\b|resolv|\bTLS\b|handshake|error sending request|failed to send|HTTP (?:408|502|503|504)\b",
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
             string error = DaemonUnavailable(r) ? "err.warpDaemon" : pending ? "err.warpRegistrationPending" : "err.warpRegistrationCreate";
             return RegistrationFailed(error);
+        }
+
+        internal async Task<bool> RetryRegistrationAsync(CancellationToken ct)
+        {
+            if (!RegistrationCanRetry) return false;
+            // После IPC-тайм-аута прежний вызов мог ещё выполняться внутри службы.
+            var delay = _registrationPendingUntil - DateTime.UtcNow;
+            if (delay > TimeSpan.Zero) await Task.Delay(delay, ct);
+            return await EnsureRegisteredAsync(ct);
         }
 
         bool RegistrationFailed(string key)
@@ -196,13 +214,22 @@ namespace Zarp.Core
         public async Task<WarpAccountType> ApplyLicenseAsync(string key, CancellationToken ct = default)
         {
             if (!IsLicenseValid(key)) throw new ArgumentException(L.T("warpPlus.invalid"));
-            key = key.Trim(); // строго один безопасный аргумент, без shell и подстановок
-            RunResult result;
             try
             {
                 if (!await EnsureRegisteredAsync(ct)) throw new IOException();
-                result = await Cli("registration license " + key, 30000, ct);
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch (Exception) { throw new IOException(L.T("warpPlus.applyFailed")); }
+            return await ApplyRegisteredLicenseAsync(key, ct);
+        }
+
+        // Engine вызывает после проверки регистрации; при восстановлении регистрации zapret2 остаётся включён до привязки ключа.
+        internal async Task<WarpAccountType> ApplyRegisteredLicenseAsync(string key, CancellationToken ct)
+        {
+            if (!IsLicenseValid(key)) throw new ArgumentException(L.T("warpPlus.invalid"));
+            key = key.Trim(); // строго один безопасный аргумент, без shell и подстановок
+            RunResult result;
+            try { result = await Cli("registration license " + key, 30000, ct); }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             // Вывод CLI и даже исключение запуска могут содержать ключ. Не прикладываем их к ошибке или журналу.
             catch (Exception) { throw new IOException(L.T("warpPlus.applyFailed")); }
