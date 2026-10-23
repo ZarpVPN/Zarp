@@ -38,6 +38,7 @@ namespace Zarp.Core
             new Language("hi", "हिन्दी"),
             new Language("fr", "Français"),
             new Language("de", "Deutsch"),
+            new Language("fa", "فارسی"),
         };
 
         const string Fallback = "en";
@@ -46,6 +47,7 @@ namespace Zarp.Core
 
         /// <summary>Код текущего языка.</summary>
         public static string Current { get; private set; } = Fallback;
+        public static bool IsRightToLeft => Current == "fa";
 
         /// <summary>Язык сменился. Вызывается в потоке, который вызвал Apply (в приложении - поток окна).</summary>
         public static event Action Changed;

@@ -275,7 +275,7 @@ static partial class Program
         }
     }
 
-    static readonly string[] ExpectedLanguages = { "en", "ru", "es", "pt", "zh", "hi", "fr", "de" };
+    static readonly string[] ExpectedLanguages = { "en", "ru", "es", "pt", "zh", "hi", "fr", "de", "fa" };
 
     static string Placeholders(string text) =>
         string.Join(",", Regex.Matches(text ?? "", @"\{\d+\}").Cast<Match>().Select(m => m.Value).Distinct().OrderBy(v => v));
@@ -283,7 +283,7 @@ static partial class Program
     static void TestLocalization()
     {
         var codes = L.Languages.Select(l => l.Code).ToArray();
-        Check(codes.SequenceEqual(ExpectedLanguages), "All eight languages must be offered in the menu order");
+        Check(codes.SequenceEqual(ExpectedLanguages), "All nine languages must be offered in the menu order");
         var english = new HashSet<string>(L.KeysOf("en"));
         Check(english.Count > 100, "English strings must load from the embedded resource");
         foreach (var code in codes)
@@ -299,7 +299,7 @@ static partial class Program
 
         // язык Windows: региональные варианты сводятся к языку, неподдерживаемый - к английскому
         foreach (var pair in new[] { ("pt-BR", "pt"), ("pt-PT", "pt"), ("zh-CN", "zh"), ("hi-IN", "hi"), ("de-AT", "de"),
-                                     ("fr-CA", "fr"), ("es-MX", "es"), ("ru-RU", "ru"), ("en-GB", "en"), ("ja-JP", "en"), ("uk-UA", "en") })
+                                     ("fr-CA", "fr"), ("es-MX", "es"), ("ru-RU", "ru"), ("en-GB", "en"), ("fa-IR", "fa"), ("ja-JP", "en"), ("uk-UA", "en") })
             Check(L.Map(new CultureInfo(pair.Item1)) == pair.Item2, pair.Item1 + " must map to " + pair.Item2);
         Check(L.Map(CultureInfo.InvariantCulture) == "en", "Invariant culture must fall back to English");
         Check(L.Resolve(null) == L.SystemLanguage && L.Resolve("") == L.SystemLanguage && L.Resolve("xx") == L.SystemLanguage,

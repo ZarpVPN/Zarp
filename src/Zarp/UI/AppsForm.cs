@@ -21,7 +21,7 @@ namespace Zarp.UI
 
         readonly Engine _engine;
         readonly ToggleSwitch _enable = new ToggleSwitch(L.T("apps.enable"));
-        readonly DarkTextBox _search = new DarkTextBox(false);
+        readonly DarkTextBox _search = new DarkTextBox(false, naturalLanguage: true);
         readonly DarkListView _list = new DarkListView();
         readonly Label _summary = new Label();
         readonly DarkButton _add, _refresh, _close;

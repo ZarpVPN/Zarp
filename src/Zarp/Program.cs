@@ -60,7 +60,7 @@ namespace Zarp
             var paths = others.Select(o => o.Path).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             var answer = MessageBox.Show(
                 L.T(paths.Count > 1 ? "dlg.otherCopies" : "dlg.otherCopy", string.Join("\n", paths)),
-                "Zarp", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                "Zarp", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1, UI.Theme.MessageOptions);
             if (answer != DialogResult.Yes)
             {
                 if (owned) return true; // та копия не держит блокировку (например, старый ZWARP): работаем рядом
@@ -77,7 +77,8 @@ namespace Zarp
             }
             if (!owned)
             {
-                MessageBox.Show(L.T("dlg.otherCopyFailed"), "Zarp", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(L.T("dlg.otherCopyFailed"), "Zarp", MessageBoxButtons.OK, MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button1, UI.Theme.MessageOptions);
                 return false;
             }
             if (wasConnected)

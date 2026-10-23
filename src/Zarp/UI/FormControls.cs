@@ -60,7 +60,7 @@ namespace Zarp.UI
     {
         readonly TextBox _box = new TextBox();
 
-        public DarkTextBox(bool multiline)
+        public DarkTextBox(bool multiline, bool naturalLanguage = false)
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
                      ControlStyles.ResizeRedraw, true);
@@ -74,6 +74,7 @@ namespace Zarp.UI
             _box.ScrollBars = multiline ? ScrollBars.Vertical : ScrollBars.None;
             _box.Dock = DockStyle.Fill;
             _box.Font = Theme.Font(9.5f);
+            RightToLeft = _box.RightToLeft = naturalLanguage && L.IsRightToLeft ? RightToLeft.Yes : RightToLeft.No;
             _box.GotFocus += (s, e) => Invalidate();
             _box.LostFocus += (s, e) => Invalidate();
             _box.TextChanged += (s, e) => OnTextChanged(EventArgs.Empty);
@@ -136,6 +137,7 @@ namespace Zarp.UI
     {
         public DarkListView()
         {
+            RightToLeft = RightToLeft.No; // file paths and technical columns must not be reordered
             View = View.Details;
             FullRowSelect = true;
             HideSelection = false;
@@ -159,7 +161,7 @@ namespace Zarp.UI
                 e.Graphics.DrawLine(line, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
             var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis |
                         (e.Header.TextAlign == HorizontalAlignment.Right ? TextFormatFlags.Right : TextFormatFlags.Left);
-            TextRenderer.DrawText(e.Graphics, e.Header.Text, Font, Rectangle.Inflate(e.Bounds, -6, 0), Theme.TextDim, flags);
+            TextRenderer.DrawText(e.Graphics, e.Header.Text, Font, Rectangle.Inflate(e.Bounds, -6, 0), Theme.TextDim, flags | Theme.TextDirection);
         }
 
         /// <summary>Растянуть колонку на оставшуюся ширину, чтобы справа от шапки не оставалось светлой полосы.</summary>
@@ -196,6 +198,7 @@ namespace Zarp.UI
             Margin = Padding.Empty;
             AccessibleRole = AccessibleRole.ComboBox;
             _menu.Renderer = new DarkMenuRenderer();
+            _menu.RightToLeft = L.IsRightToLeft ? RightToLeft.Yes : RightToLeft.No;
             _menu.ShowImageMargin = false;
             _menu.ShowCheckMargin = false;
             _menu.Padding = new Padding(3);
@@ -268,10 +271,11 @@ namespace Zarp.UI
         protected override void DrawContent(Graphics g, Color color)
         {
             int inset = Math.Max(10, Height / 3);
-            var textBounds = new Rectangle(inset, 0, Width - inset - Height, Height);
+            var textBounds = new Rectangle(L.IsRightToLeft ? Height : inset, 0, Width - inset - Height, Height);
             TextRenderer.DrawText(g, Text, Font, textBounds, color,
-                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
-            float cx = Width - Height / 2f, cy = (Height - 1) / 2f;
+                (L.IsRightToLeft ? TextFormatFlags.Right : TextFormatFlags.Left) | Theme.TextDirection |
+                TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            float cx = L.IsRightToLeft ? Height / 2f : Width - Height / 2f, cy = (Height - 1) / 2f;
             float size = Height * 0.12f;
             using (var pen = new Pen(color, Math.Max(1.5f, Height / 22f)) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
                 g.DrawLines(pen, new[] { new PointF(cx - size, cy - size / 2), new PointF(cx, cy + size / 2), new PointF(cx + size, cy - size / 2) });

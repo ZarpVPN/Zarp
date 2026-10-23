@@ -43,11 +43,11 @@ Join our [Zarp Community](https://github.com/orgs/ZarpVPN/discussions)!
 - **Routing and per-program proxy** (your own server). Presets for local networks, Russia, Iran and China, editable Direct, Proxy and Block rules (GeoIP, GeoSite, domains, IP ranges, regular expressions), downloadable V2Ray/Xray `.dat` databases, and a choice of the programs that use the server. See [connection settings](docs/connection-settings.md).
 - **Zero setup.** A single `Zarp.exe` with zapret2, sing-box and Xray-core embedded; zapret2 updates itself in the background. If Cloudflare WARP is missing, Zarp downloads the official client from Cloudflare and installs it after you agree.
 - **Low overhead.** Only the connection to WARP (or, with your own server, to that one server) is intercepted, and only its handshake packets are changed. The traffic of the tunnel is not touched.
-- **Your language.** English, Русский, Español, Português, 中文, हिन्दी, Français and Deutsch. Zarp follows the Windows language (English if it is not on the list), and the globe button switches it on the fly.
+- **Your language.** English, Русский, Español, Português, 中文, हिन्दी, Français, Deutsch and فارسی. Zarp follows the Windows language (English if it is not on the list), and the globe button switches it on the fly. Persian uses right-to-left text; connection links, IP addresses and license keys keep their left-to-right direction.
 
 ## Android
 
-[Zarp for Android](https://github.com/ZarpVPN/Zarp-Android) brings the same one-tap flow to phones: the same strategies, double-checked tests, quick and full scan, and the same 8 languages. It works a little differently under the hood:
+[Zarp for Android](https://github.com/ZarpVPN/Zarp-Android) brings the same one-tap flow to phones: the same strategies, double-checked tests, quick and full scan, and eight languages. It works a little differently under the hood:
 
 - **No WARP app needed.** Zarp talks to WARP itself over MASQUE and registers a free WARP device on first use.
 - **No root.** It is a regular Android VPN. Fake packets are sent from the tunnel's own UDP socket right before the real handshake.
@@ -82,6 +82,10 @@ Closing the window asks whether to hide Zarp in the tray or quit. Select **Remem
 
 > [!NOTE]
 > Turn off any other VPN (Happ, v2rayN, Clash, AmneziaVPN, ...) before searching. The traffic of WARP (or of your own server) would go through its tunnel, so every test would measure that VPN instead of your network and no strategy would be found. Zarp warns you, asks before searching anyway, and never overwrites saved results with failures from such a run. Connecting with a strategy you already saved works either way.
+
+Virtual LAN adapters such as Radmin VPN are checked against the Windows routes to WARP endpoints. An active adapter that only carries its own LAN traffic does not trigger the VPN warning. If the routing table cannot be read, Zarp keeps the warning as a precaution.
+
+**WARP registration or IPC timeout?** Zarp waits and reads the existing registration again before creating a new one. A timeout is not treated as proof that the device is unregistered. A delayed registration, including an "Old registration is still around" response, is checked again without deleting the account or its WARP+ license. If the service remains unresponsive, restart the **CloudflareWARP** Windows service or restart Windows, then try again. Restarting that service interrupts the WARP connection; reconnect through Zarp afterwards.
 
 > [!WARNING]
 > Windows Defender may flag WinDivert as a hacktool. This is a known false positive. Zarp offers to add its zapret2 folder to Defender exclusions when that happens. The same offer is made for the sing-box folder if you use your own server and the antivirus blocks `sing-box.exe`, and for the Xray folder if the link uses XHTTP and the antivirus blocks `xray.exe`.

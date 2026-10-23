@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using Zarp.Core;
 
 namespace Zarp.UI
 {
@@ -67,7 +68,7 @@ namespace Zarp.UI
         protected virtual void DrawContent(Graphics g, Color color)
         {
             TextRenderer.DrawText(g, Text, Font, ClientRectangle, color,
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | Theme.TextDirection);
         }
 
         protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
@@ -153,7 +154,7 @@ namespace Zarp.UI
                 e.Graphics.FillRectangle(brush, new Rectangle(Point.Empty, e.Item.Size));
             if (e.Item is ToolStripMenuItem item && item.Checked)
                 using (var brush = new SolidBrush(Theme.Accent))
-                    e.Graphics.FillRectangle(brush, 0, item.Height / 4, 2, item.Height / 2);
+                    e.Graphics.FillRectangle(brush, e.ToolStrip.RightToLeft == RightToLeft.Yes ? item.Width - 2 : 0, item.Height / 4, 2, item.Height / 2);
         }
 
         protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
@@ -207,6 +208,7 @@ namespace Zarp.UI
             Margin = Padding.Empty;
             AccessibleRole = AccessibleRole.ComboBox;
             _menu.Renderer = new DarkMenuRenderer();
+            _menu.RightToLeft = L.IsRightToLeft ? RightToLeft.Yes : RightToLeft.No;
             _menu.ShowImageMargin = false;
             _menu.ShowCheckMargin = false;
             _menu.Padding = new Padding(3);
@@ -223,10 +225,11 @@ namespace Zarp.UI
         protected override void DrawContent(Graphics g, Color color)
         {
             int inset = Math.Max(10, Height / 3);
-            var textBounds = new Rectangle(inset, 0, Width - inset - Height, Height);
+            var textBounds = new Rectangle(L.IsRightToLeft ? Height : inset, 0, Width - inset - Height, Height);
             TextRenderer.DrawText(g, Text, Font, textBounds, color,
-                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
-            float cx = Width - Height / 2f, cy = (Height - 1) / 2f;
+                (L.IsRightToLeft ? TextFormatFlags.Right : TextFormatFlags.Left) | Theme.TextDirection |
+                TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            float cx = L.IsRightToLeft ? Height / 2f : Width - Height / 2f, cy = (Height - 1) / 2f;
             float size = Height * 0.12f;
             using (var pen = new Pen(color, Math.Max(1.5f, Height / 22f)) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
                 g.DrawLines(pen, new[] { new PointF(cx - size, cy - size / 2), new PointF(cx, cy + size / 2), new PointF(cx + size, cy - size / 2) });
@@ -307,7 +310,7 @@ namespace Zarp.UI
             g.Clear(Parent?.BackColor ?? Theme.Back);
 
             float th = TrackH, tw = TrackW;
-            var track = new RectangleF(0.5f, (Height - th) / 2f, tw, th);
+            var track = new RectangleF(L.IsRightToLeft ? Width - tw - 0.5f : 0.5f, (Height - th) / 2f, tw, th);
             Color trackColor = Checked
                 ? (_hover ? ControlPaint.Light(Theme.Accent, 0.15f) : Theme.Accent)
                 : (_hover ? Theme.BorderHover : Theme.Off);
@@ -321,9 +324,10 @@ namespace Zarp.UI
             using (var br = new SolidBrush(Checked ? Theme.OnAccentKnob : Theme.Text))
                 g.FillEllipse(br, kx, track.Y + pad, knob, knob);
 
-            var textRect = new Rectangle((int)(tw + Gap), 0, Width - (int)(tw + Gap), Height);
+            var textRect = new Rectangle(L.IsRightToLeft ? 0 : (int)(tw + Gap), 0, Width - (int)(tw + Gap), Height);
             TextRenderer.DrawText(g, Text, Font, textRect, Enabled ? Theme.Text : Theme.TextDisabled,
-                TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+                TextFormatFlags.VerticalCenter | (L.IsRightToLeft ? TextFormatFlags.Right : TextFormatFlags.Left) |
+                TextFormatFlags.EndEllipsis | Theme.TextDirection);
         }
     }
 

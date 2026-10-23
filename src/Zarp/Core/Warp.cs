@@ -26,6 +26,9 @@ namespace Zarp.Core
         internal static Func<WarpLocator.Result> Finder = WarpLocator.Find;
         internal static Func<string, Authenticode.Result> VerifyCli = Authenticode.Verify;
         internal Func<string, int, CancellationToken, Task<RunResult>> CommandRunner = null;
+        internal int RegistrationRetryDelayMs = 1000;
+        DateTime _registrationPendingUntil;
+        public Msg LastRegistrationError { get; private set; }
 
         // последний выставленный транспорт - чтобы не дёргать настройки WARP без нужды
         WarpTransport? _transport;
@@ -101,12 +104,59 @@ namespace Zarp.Core
         /// <summary>Проверить, что клиент зарегистрирован; если нет - зарегистрировать.</summary>
         public async Task<bool> EnsureRegisteredAsync(CancellationToken ct = default)
         {
-            var r = await Cli("registration show", ct: ct);
+            LastRegistrationError = null;
+            var r = await ReadRegistrationAsync(ct, waitForCreation: DateTime.UtcNow < _registrationPendingUntil);
             if (r.Ok) return true;
+            if (!RegistrationMissing(r))
+            {
+                return RegistrationFailed(DaemonUnavailable(r) ? "err.warpDaemon" : "err.warpRegistrationCheck");
+            }
+            if (DateTime.UtcNow < _registrationPendingUntil) return RegistrationFailed("err.warpRegistrationPending");
             Log.Write(L.T("log.warpRegistering"));
-            r = await Cli("registration new", 30000, ct);
-            Log.Write(r.Ok ? L.T("log.warpRegistered") : L.T("log.warpRegisterFailed", r.Output));
-            return r.Ok;
+            _registrationPendingUntil = DateTime.UtcNow.AddSeconds(30);
+            var created = await Cli("registration new", 60000, ct);
+            _registrationPendingUntil = DateTime.UtcNow.AddSeconds(30);
+            // Даже при IPC-тайм-ауте демон мог создать регистрацию. Перечитать её безопаснее, чем создавать снова
+            // или удалять прежнюю регистрацию вместе с привязанной подпиской WARP+.
+            r = await ReadRegistrationAsync(ct, waitForCreation: true);
+            if (r.Ok)
+            {
+                Log.Write(L.T("log.warpRegistered"));
+                return true;
+            }
+            bool pending = created.Ok || DaemonUnavailable(created) || Regex.IsMatch(created.Output ?? "",
+                @"old registration is still around|already.?registered|registration already exists|existing.?registration", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            string error = DaemonUnavailable(r) ? "err.warpDaemon" : pending ? "err.warpRegistrationPending" : "err.warpRegistrationCreate";
+            return RegistrationFailed(error);
+        }
+
+        bool RegistrationFailed(string key)
+        {
+            LastRegistrationError = new Msg(key);
+            Log.Write(L.T("log.warpRegisterFailed", LastRegistrationError));
+            return false;
+        }
+
+        static bool DaemonUnavailable(RunResult result) => !result.Ok && (result.TimedOut || Regex.IsMatch(result.Output ?? "",
+            @"communicating with (?:the )?daemon|IPC.*(?:timeout|timed out)|daemon.*(?:not running|unavailable|not responding)|(?:unable|failed) to connect.*daemon",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
+
+        static bool RegistrationMissing(RunResult result) => !result.Ok && !DaemonUnavailable(result) && Regex.IsMatch(result.Output ?? "",
+            @"\b(?:Missing\s*Registration|Registration\s*(?:Missing|NotFound)|NotRegistered|registration (?:is )?(?:missing|not found)|not registered|no (?:device )?registration(?: found| exists)?|warp-cli registration new)\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        async Task<RunResult> ReadRegistrationAsync(CancellationToken ct, bool waitForCreation = false)
+        {
+            for (int attempt = 0; ; attempt++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var result = await Cli("registration show", ct: ct);
+                if (result.Ok) _registrationPendingUntil = DateTime.MinValue;
+                if (result.Ok || attempt >= 2 || (!DaemonUnavailable(result) && !(waitForCreation && RegistrationMissing(result))))
+                    return result;
+                if (attempt == 0) Log.Write(L.T("log.warpRegistrationWaiting"));
+                await Task.Delay(RegistrationRetryDelayMs, ct);
+            }
         }
 
         static readonly Regex LicenseKey = new Regex(@"\A[A-Za-z0-9]{8}-[A-Za-z0-9]{8}-[A-Za-z0-9]{8}\z", RegexOptions.CultureInvariant);
@@ -135,7 +185,7 @@ namespace Zarp.Core
         {
             try
             {
-                var result = await Cli("registration show", ct: ct);
+                var result = await ReadRegistrationAsync(ct);
                 return result.Ok ? ParseAccountType(result.Output) : WarpAccountType.Unknown;
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
@@ -150,13 +200,7 @@ namespace Zarp.Core
             RunResult result;
             try
             {
-                var registration = await Cli("registration show", ct: ct);
-                if (!registration.Ok)
-                {
-                    // Не пересоздаём существующую регистрацию: её удаление отвязало бы подписку и настройки устройства.
-                    result = await Cli("registration new", 30000, ct);
-                    if (!result.Ok) throw new IOException();
-                }
+                if (!await EnsureRegisteredAsync(ct)) throw new IOException();
                 result = await Cli("registration license " + key, 30000, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }

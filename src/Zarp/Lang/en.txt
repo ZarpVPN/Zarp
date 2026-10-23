@@ -394,6 +394,13 @@ warpPlus.plus = WARP+
 warpPlus.unlimited = WARP+ Unlimited
 warpPlus.zerotrust = Cloudflare Zero Trust
 
+# ---- service and registration recovery
+log.warpRegistrationWaiting = Waiting for the WARP service; checking the existing registration again.
+err.warpDaemon = The WARP service did not respond. Restart the Cloudflare WARP service or Windows, then try again.
+err.warpRegistrationCheck = Could not read the existing WARP registration. Check that the WARP service is running and try again.
+err.warpRegistrationPending = WARP has not confirmed its registration yet. Wait or restart the WARP service, then try again. The existing registration was kept.
+err.warpRegistrationCreate = WARP could not register this device. Check access to Cloudflare and try again.
+
 # ---- checks of the adapter and leftovers of an earlier run
 err.tunNoTraffic = The Zarp adapter is up, but no traffic goes through it
 log.singboxOrphan = A sing-box from an earlier run is still working and Zarp cannot take it over: stopping it.

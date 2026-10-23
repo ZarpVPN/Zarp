@@ -66,6 +66,7 @@ namespace Zarp.UI
             };
 
             _list.View = View.Details;
+            _list.RightToLeft = RightToLeft.No; // protocol names, endpoints and strategy arguments stay LTR
             _list.FullRowSelect = true;
             _list.MultiSelect = true;
             _list.HideSelection = false;
@@ -204,7 +205,7 @@ namespace Zarp.UI
             defender.Click += async (s, e) =>
             {
                 if (MessageBox.Show(this, L.T("dlg.defender", _engine.Zapret.Dir),
-                        "Zarp", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                        "Zarp", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1, Theme.MessageOptions) == DialogResult.Yes)
                     await _engine.Zapret.AddDefenderExclusionAsync();
             };
             var update = Theme.FlatButton(L.T("btn.checkUpdates"), rightWidth);
@@ -299,7 +300,7 @@ namespace Zarp.UI
             var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis |
                         (e.Header.TextAlign == HorizontalAlignment.Right ? TextFormatFlags.Right : TextFormatFlags.Left);
             var r = Rectangle.Inflate(e.Bounds, -6, 0);
-            TextRenderer.DrawText(e.Graphics, e.Header.Text, _list.Font, r, Theme.TextDim, flags);
+            TextRenderer.DrawText(e.Graphics, e.Header.Text, _list.Font, r, Theme.TextDim, flags | Theme.TextDirection);
         }
 
         /// <summary>Колонка «Результат» забирает свободную ширину, чтобы справа от шапки не оставалось светлой полосы.</summary>

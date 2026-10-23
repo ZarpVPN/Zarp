@@ -750,7 +750,7 @@ namespace Zarp.Core
             if (!AskAboutForeignVpn(searching)) return false;
             if (!await Warp.EnsureRegisteredAsync(ct))
             {
-                Set(EngineState.Idle, M("detail.registerFailed"));
+                Set(EngineState.Idle, Warp.LastRegistrationError ?? M("detail.registerFailed"));
                 return false;
             }
             return true;

@@ -38,9 +38,9 @@ static partial class Program
 
         mock.Calls.Clear();
         int reads = 0;
-        mock.Override = cmd => cmd == "registration show" ? new RunResult { ExitCode = ++reads == 1 ? 1 : 0, Output = WarpPlusRegistration } : null;
+        mock.Override = cmd => cmd == "registration show" ? (++reads == 1 ? new RunResult { ExitCode = 1, Output = "Error: MissingRegistration" } : new RunResult { Output = WarpPlusRegistration }) : null;
         Check(await warp.ApplyLicenseAsync(WarpPlusTestKey) == WarpAccountType.Unlimited &&
-              mock.Calls.SequenceEqual(new[] { "registration show", "registration new", "registration license " + WarpPlusTestKey, "registration show" }),
+              mock.Calls.SequenceEqual(new[] { "registration show", "registration new", "registration show", "registration license " + WarpPlusTestKey, "registration show" }),
               "A new device is registered before linking its subscription");
     }
 

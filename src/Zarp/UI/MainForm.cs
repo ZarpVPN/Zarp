@@ -142,6 +142,7 @@ namespace Zarp.UI
             _logToggle.Click += (s, e) => ToggleLog();
 
             _log.Multiline = true;
+            _log.RightToLeft = RightToLeft.No;
             _log.ReadOnly = true;
             _log.ScrollBars = ScrollBars.Vertical;
             _log.BorderStyle = BorderStyle.None;
@@ -173,6 +174,9 @@ namespace Zarp.UI
         /// <summary>Все тексты окна и меню трея на текущем языке. Вызывается и при смене языка.</summary>
         void ApplyTexts()
         {
+            Theme.ApplyTextDirection(this);
+            _languageMenu.RightToLeft = RightToLeft;
+            _tray.ContextMenuStrip.RightToLeft = RightToLeft;
             _tips.SetToolTip(_settings, L.T("main.settingsTip"));
             _tips.SetToolTip(_language, L.T("main.languageTip"));
             _settings.AccessibleName = L.T("main.settingsTip");
@@ -366,7 +370,7 @@ namespace Zarp.UI
             // у sing-box и Xray другая причина (прокси-программы часто принимают за вредоносные), и WinDivert тут ни при чём
             bool proxyProgram = ProcessUtil.SamePath(dir, _engine.SingBox.Dir) || ProcessUtil.SamePath(dir, _engine.Xray.Dir);
             Func<bool> ask = () => MessageBox.Show(this, L.T(proxyProgram ? "dlg.antivirusProxy" : "dlg.antivirus", dir),
-                "Zarp", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
+                "Zarp", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1, Theme.MessageOptions) == DialogResult.Yes;
             return InvokeRequired ? (bool)Invoke(ask) : ask();
         }
 
@@ -376,7 +380,7 @@ namespace Zarp.UI
             // а подбирать новую через чужой VPN бессмысленно
             if (_autostart && !Visible) return !searching;
             Func<bool> ask = () => MessageBox.Show(this, L.T(searching ? "dlg.vpnSearch" : "dlg.vpn", string.Join("\n", adapters)),
-                "Zarp", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes;
+                "Zarp", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2, Theme.MessageOptions) == DialogResult.Yes;
             return InvokeRequired ? (bool)Invoke(ask) : ask();
         }
 
@@ -385,7 +389,7 @@ namespace Zarp.UI
         {
             if (_autostart && !Visible) return false; // при автозапуске Zarp скрыт в трее: вопрос никто не увидит
             Func<bool> ask = () => MessageBox.Show(this, L.T("dlg.installWarp"),
-                "Zarp", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
+                "Zarp", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1, Theme.MessageOptions) == DialogResult.Yes;
             return InvokeRequired ? (bool)Invoke(ask) : ask();
         }
 

@@ -50,6 +50,10 @@ static partial class Program
         Add(nameof(TestRunnerReporting), TestRunnerReporting);
         Add(nameof(TestConfig), TestConfig);
         Add(nameof(TestVpnDetection), TestVpnDetection);
+        Add(nameof(TestVpnRouteDetection), TestVpnRouteDetection);
+        Add(nameof(TestWarpRegistrationRecoveryAsync), () => Wait(TestWarpRegistrationRecoveryAsync));
+        Add(nameof(TestWarpRegistrationFailuresAsync), () => Wait(TestWarpRegistrationFailuresAsync));
+        Add(nameof(TestPersianTextDirection), TestPersianTextDirection);
         Add(nameof(TestBuiltInStrategies), TestBuiltInStrategies);
         Add(nameof(TestPackedStrategyFiles), TestPackedStrategyFiles);
         Add(nameof(TestLoaderRetry), TestLoaderRetry);

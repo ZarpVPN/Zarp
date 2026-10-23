@@ -183,7 +183,8 @@ namespace Zarp.UI
                 Save(p.Id);
                 return;
             }
-            if (MessageBox.Show(this, L.T("routing.deleteConfirm", PresetName(p)), "Zarp", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            if (MessageBox.Show(this, L.T("routing.deleteConfirm", PresetName(p)), "Zarp", MessageBoxButtons.YesNo, MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button1, Theme.MessageOptions) != DialogResult.Yes) return;
             Routing.Presets.RemoveAll(x => x.Id == p.Id);
             if (Routing.SelectedPreset == p.Id)
             {
@@ -204,7 +205,7 @@ namespace Zarp.UI
     {
         readonly RoutingPreset _preset;
         readonly bool _custom;
-        readonly DarkTextBox _name = new DarkTextBox(false);
+        readonly DarkTextBox _name = new DarkTextBox(false, naturalLanguage: true);
         readonly DarkTextBox _direct = new DarkTextBox(true), _proxy = new DarkTextBox(true), _block = new DarkTextBox(true);
         readonly Label _error = new Label();
         readonly DarkButton _save, _cancel, _reset;

@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using Zarp.Core;
 
 namespace Zarp.UI
 {
@@ -35,6 +36,7 @@ namespace Zarp.UI
         /// <summary>Тёмный системный заголовок окна (Windows 10 20H1+ / 11).</summary>
         public static void DarkTitleBar(Form f)
         {
+            ApplyTextDirection(f);
             f.HandleCreated += (s, e) =>
             {
                 int on = 1;
@@ -43,6 +45,17 @@ namespace Zarp.UI
                 int caption = ColorTranslator.ToWin32(Back);
                 DwmSetWindowAttribute(f.Handle, 35 /* DWMWA_CAPTION_COLOR, Windows 11 */, ref caption, 4);
             };
+        }
+
+        public static TextFormatFlags TextDirection => L.IsRightToLeft ? TextFormatFlags.RightToLeft : 0;
+        public static MessageBoxOptions MessageOptions => L.IsRightToLeft ? MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign : 0;
+
+        public static void ApplyTextDirection(Form form)
+        {
+            form.RightToLeft = L.IsRightToLeft ? RightToLeft.Yes : RightToLeft.No;
+            // Native mirroring does not support the owner-drawn controls used here. Keep their coordinates stable
+            // and apply RTL reading/alignment explicitly; technical inputs retain their own LTR direction.
+            form.RightToLeftLayout = false;
         }
 
         /// <summary>Тёмные полосы прокрутки у стандартных контролов.</summary>
@@ -65,7 +78,9 @@ namespace Zarp.UI
         /// <summary>Метка заданной ширины с переносом строк и высотой по тексту.</summary>
         public static Label WrappedLabel(string text, Font font, Color color, Point at, int width)
         {
-            var label = new Label { Text = text, Font = font, ForeColor = color, AutoSize = false, Location = at };
+            var label = new Label { Text = text, Font = font, ForeColor = color, AutoSize = false, Location = at,
+                RightToLeft = L.IsRightToLeft ? RightToLeft.Yes : RightToLeft.No,
+                TextAlign = L.IsRightToLeft ? ContentAlignment.TopRight : ContentAlignment.TopLeft };
             label.Size = new Size(width, label.GetPreferredSize(new Size(width, 0)).Height);
             return label;
         }
